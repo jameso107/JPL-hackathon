@@ -1,0 +1,109 @@
+# Schema-mapping profiles: source columns/fields → canonical MissionModel roles.
+# A file matches a profile if (a) its name matches a file_pattern, or (b) all
+# signature_fields are present. `from` lists acceptable source names; first match wins.
+profiles:
+  - id: msrh_telemetry_v1
+    role: telemetry
+    format: csv
+    file_patterns: ["telemetry"]
+    signature_fields: [flight_number, vibration_amplitude_g, cumulative_rotor_hours]
+    columns:
+      - { to: flightNumber, from: [flight_number], required: true }
+      - { to: sol, from: [sol], required: true }
+      - { to: dateUtc, from: [date_utc] }
+      - { to: durationMin, from: [duration_minutes], required: true }
+      - { to: cumulativeRotorHours, from: [cumulative_rotor_hours], required: true }
+      - { to: rotorRpmAvg, from: [rotor_rpm_avg], required: true }
+      - { to: vibrationG, from: [vibration_amplitude_g], required: true }
+      - { to: motorTempC, from: [motor_temp_c] }
+      - { to: ambientTempC, from: [ambient_temp_c], required: true }
+      - { to: batteryVStart, from: [battery_voltage_start] }
+      - { to: batteryVEnd, from: [battery_voltage_end] }
+      - { to: windSpeedMs, from: [wind_speed_ms], required: true }
+      - { to: maxAltitudeM, from: [max_altitude_m] }
+      - { to: objective, from: [flight_objective] }
+      - { to: anomalyFlag, from: [anomaly_flag] }
+
+  - id: msrh_maintenance_v2
+    role: maintenance
+    format: json
+    file_patterns: ["maintenance"]
+    signature_fields: [action_id, subsystem, notes]
+    columns:
+      - { to: actionId, from: [action_id], required: true }
+      - { to: sol, from: [sol], required: true }
+      - { to: dateUtc, from: [date_utc] }
+      - { to: action, from: [action], required: true }
+      - { to: subsystem, from: [subsystem], required: true }
+      # current schema first, legacy `technician` accepted for older exports
+      - { to: commandingEngineer, from: [commanding_engineer, technician] }
+      - { to: executionMethod, from: [execution_method] }
+      - { to: notes, from: [notes], required: true }
+      - { to: durationHours, from: [duration_hours] }
+
+  - id: msrh_anomaly_history_v1
+    role: anomaly_history
+    format: json
+    file_patterns: ["anomaly"]
+    signature_fields: [anomaly_id, root_cause, resolution]
+    columns:
+      - { to: anomalyId, from: [anomaly_id], required: true }
+      - { to: vehicle, from: [vehicle], required: true }
+      - { to: sol, from: [sol] }
+      - { to: category, from: [category], required: true }
+      - { to: severity, from: [severity] }
+      - { to: description, from: [description], required: true }
+      - { to: rootCause, from: [root_cause], required: true }
+      - { to: resolution, from: [resolution], required: true }
+      - { to: downtimeSols, from: [downtime_sols] }
+      - { to: relatedMaintenance, from: [related_maintenance] }
+
+  - id: msrh_inventory_v1
+    role: inventory
+    format: csv
+    file_patterns: ["parts", "inventory"]
+    signature_fields: [part_number, quantity_mars_depot]
+    columns:
+      - { to: partNumber, from: [part_number], required: true }
+      - { to: description, from: [description], required: true }
+      - { to: quantityMarsDepot, from: [quantity_mars_depot], required: true }
+      - { to: quantityEarthStaging, from: [quantity_earth_staging] }
+      - { to: nextResupplySol, from: [next_resupply_sol] }
+      - { to: unitCostUsd, from: [unit_cost_usd] }
+      - { to: leadTimeWeeksFromEarth, from: [lead_time_weeks_from_earth] }
+      - { to: notes, from: [notes] }
+
+  - id: msrh_timeline_v1
+    role: timeline
+    format: json
+    file_patterns: ["timeline", "mission"]
+    signature_fields: [current_sol, scheduled_flights]
+    columns: []   # nested object — mapped structurally in the ingest module
+
+  - id: msrh_team_v1
+    role: team
+    format: json
+    file_patterns: ["team", "engineering"]
+    signature_fields: [name, expertise, availability]
+    columns:
+      - { to: name, from: [name], required: true }
+      - { to: role, from: [role], required: true }
+      - { to: expertise, from: [expertise], required: true }
+      - { to: certifications, from: [certifications] }
+      - { to: currentAssignment, from: [current_assignment] }
+      - { to: shift, from: [shift] }
+      - { to: timezone, from: [timezone] }
+      - { to: availability, from: [availability], required: true }
+      - { to: yearsExperience, from: [years_experience] }
+
+  - id: msrh_budget_v1
+    role: budget
+    format: csv
+    file_patterns: ["budget", "contingency"]
+    signature_fields: [category, remaining_usd]
+    columns:
+      - { to: category, from: [category], required: true }
+      - { to: allocatedUsd, from: [allocated_usd] }
+      - { to: spentUsd, from: [spent_usd] }
+      - { to: remainingUsd, from: [remaining_usd], required: true }
+      - { to: notes, from: [notes] }

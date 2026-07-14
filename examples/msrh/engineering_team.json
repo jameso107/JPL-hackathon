@@ -1,0 +1,188 @@
+[
+  {
+    "name": "Chen, Wei",
+    "role": "Lead Mechanical Engineer",
+    "expertise": [
+      "rotor_dynamics",
+      "structural_analysis",
+      "bearing_systems",
+      "vibration_analysis"
+    ],
+    "certifications": [
+      "MSRH Flight Hardware Level A",
+      "Mars Surface Operations"
+    ],
+    "current_assignment": "MSRH anomaly review lead",
+    "shift": "07:00-15:00 PST",
+    "timezone": "America/Los_Angeles",
+    "availability": "available",
+    "years_experience": 12
+  },
+  {
+    "name": "Rodriguez, Maria",
+    "role": "Rotor Systems Specialist",
+    "expertise": [
+      "rotor_dynamics",
+      "blade_erosion",
+      "mars_atmosphere_aerodynamics",
+      "composite_materials"
+    ],
+    "certifications": [
+      "MSRH Flight Hardware Level A",
+      "Rotorcraft Dynamics Specialist"
+    ],
+    "current_assignment": "MSRH anomaly support",
+    "shift": "06:00-14:00 PST",
+    "timezone": "America/Los_Angeles",
+    "availability": "available",
+    "years_experience": 8
+  },
+  {
+    "name": "Nakamura, Yuki",
+    "role": "Flight Software Engineer",
+    "expertise": [
+      "flight_control_software",
+      "sensor_fusion",
+      "autonomous_navigation",
+      "real_time_systems"
+    ],
+    "certifications": [
+      "MSRH Software Level A",
+      "Flight Software Safety"
+    ],
+    "current_assignment": "Prospector-B autonomy upgrade",
+    "shift": "08:00-16:00 JST",
+    "timezone": "Asia/Tokyo",
+    "availability": "partial \u2014 can be reassigned for critical anomalies",
+    "years_experience": 6
+  },
+  {
+    "name": "Okafor, Chioma",
+    "role": "Avionics Engineer",
+    "expertise": [
+      "sensor_calibration",
+      "comm_systems",
+      "power_electronics",
+      "EMI_analysis"
+    ],
+    "certifications": [
+      "MSRH Avionics Level B"
+    ],
+    "current_assignment": "Overwatch relay upgrade planning",
+    "shift": "09:00-17:00 GMT",
+    "timezone": "Europe/London",
+    "availability": "available with 24hr notice",
+    "years_experience": 10
+  },
+  {
+    "name": "Petrov, Alexei",
+    "role": "Systems Engineer",
+    "expertise": [
+      "systems_integration",
+      "mission_planning",
+      "risk_assessment",
+      "trade_studies"
+    ],
+    "certifications": [
+      "MSRH Mission Operations",
+      "Systems Engineering Professional (SEP)"
+    ],
+    "current_assignment": "Earth-return mission integration",
+    "shift": "08:00-16:00 EST",
+    "timezone": "America/New_York",
+    "availability": "limited \u2014 Earth-return critical path",
+    "years_experience": 15
+  },
+  {
+    "name": "Kim, Soo-Jin",
+    "role": "Thermal Engineer",
+    "expertise": [
+      "thermal_analysis",
+      "mars_environment_modeling",
+      "battery_thermal_management",
+      "cryogenic_systems"
+    ],
+    "certifications": [
+      "MSRH Thermal Level B"
+    ],
+    "current_assignment": "Prospector-A thermal anomaly investigation",
+    "shift": "09:00-17:00 KST",
+    "timezone": "Asia/Seoul",
+    "availability": "available after Sol 250",
+    "years_experience": 7
+  },
+  {
+    "name": "Thompson, James",
+    "role": "Mission Operations Manager",
+    "expertise": [
+      "mission_planning",
+      "resource_scheduling",
+      "anomaly_response_coordination",
+      "stakeholder_communication"
+    ],
+    "certifications": [
+      "MSRH Mission Operations Director",
+      "Flight Director Certification"
+    ],
+    "current_assignment": "Day-to-day MSRH operations",
+    "shift": "06:00-14:00 PST",
+    "timezone": "America/Los_Angeles",
+    "availability": "available",
+    "years_experience": 18
+  },
+  {
+    "name": "Al-Rashid, Fatima",
+    "role": "Reliability Engineer",
+    "expertise": [
+      "failure_analysis",
+      "FMEA",
+      "reliability_prediction",
+      "bearing_fatigue_analysis"
+    ],
+    "certifications": [
+      "Certified Reliability Engineer (CRE)",
+      "MSRH Reliability Level A"
+    ],
+    "current_assignment": "Fleet reliability trending",
+    "shift": "08:00-16:00 EST",
+    "timezone": "America/New_York",
+    "availability": "available",
+    "years_experience": 11
+  },
+  {
+    "name": "Johansson, Erik",
+    "role": "Test Engineer",
+    "expertise": [
+      "vibration_testing",
+      "environmental_testing",
+      "data_acquisition",
+      "test_procedure_development"
+    ],
+    "certifications": [
+      "MSRH Test Level B"
+    ],
+    "current_assignment": "New rotor design qualification testing",
+    "shift": "07:00-15:00 CET",
+    "timezone": "Europe/Stockholm",
+    "availability": "partial \u2014 can support analysis remotely",
+    "years_experience": 5
+  },
+  {
+    "name": "Gupta, Priya",
+    "role": "Data Scientist",
+    "expertise": [
+      "telemetry_analysis",
+      "anomaly_detection_ML",
+      "time_series_analysis",
+      "predictive_maintenance"
+    ],
+    "certifications": [
+      "MSRH Data Analysis"
+    ],
+    "current_assignment": "Fleet-wide predictive maintenance model development",
+    "shift": "10:00-18:00 IST",
+    "timezone": "Asia/Kolkata",
+    "availability": "available",
+    "years_experience": 4
+  }
+]

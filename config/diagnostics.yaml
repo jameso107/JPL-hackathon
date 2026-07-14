@@ -1,0 +1,180 @@
+# Diagnostics catalog for the triage-plan generator.
+# expected_outcomes: hypothesis id → qualitative outcome label. Two hypotheses are
+# SEPARATED by a diagnostic iff their labels differ. Discrimination score =
+# Σ over separated pairs of posterior_i × posterior_j (computed at runtime).
+# gate_actions: outcome label → next-action text for the decision gates.
+diagnostics:
+  - id: ground_spin_spectrum
+    name: Ground rotor-spin spectral run
+    description: >-
+      Low-RPM rotor spin-up on the ground with high-rate IMU capture; FFT of the vibration
+      channel. Bearing wear shows characteristic sub-harmonic sidebands; blade damage shows
+      once-per-rev harmonics; a healthy spectrum with a persisting alert indicts sensing.
+    duration_sols: 2
+    required_expertise: [rotor_dynamics, vibration_analysis, data_acquisition, vibration_testing]
+    estimated_cost_usd: 15000
+    expected_outcomes:
+      bearing_degradation: bearing_sideband_signature
+      blade_erosion: once_per_rev_harmonic
+      fod_impact: once_per_rev_harmonic
+      dust_contamination: broadband_friction_noise
+      sensor_artifact: clean_spectrum_alert_persists
+      structural_loosening: mount_resonance_peak
+      environmental_transient: clean_spectrum
+      software_threshold_artifact: clean_spectrum
+      unknown_other: inconclusive
+    gate_actions:
+      bearing_sideband_signature: "Branch B: lubrication service, then mitigated critical-only flights; order MSRH-RA-002 on Sol 320 resupply"
+      once_per_rev_harmonic: "Branch C: blade imaging inspection to size damage; margin analysis per ANM-006"
+      broadband_friction_noise: "Branch D: lubrication flush + dust purge; re-run spin test"
+      clean_spectrum_alert_persists: "Branch E: sensor cross-check + software threshold audit before clearing to fly"
+      mount_resonance_peak: "Branch F: fastener torque imaging survey"
+      clean_spectrum: "Branch G: review environmental data; consider clearing with wind-window rule"
+      inconclusive: "Escalate: repeat at higher RPM steps; convene review board"
+
+  - id: bearing_play_measurement
+    name: Bearing play re-measurement
+    description: >-
+      Re-measure rotor bearing play via the robotic arm procedure (direct) and the
+      vibration-to-play inference model (indirect), and reconcile the two. Direct
+      measurement decouples the play estimate from the possibly-suspect vibration channel.
+    duration_sols: 1
+    required_expertise: [bearing_systems, rotor_dynamics, bearing_fatigue_analysis]
+    estimated_cost_usd: 8000
+    expected_outcomes:
+      bearing_degradation: play_at_or_over_limit
+      blade_erosion: play_stable
+      fod_impact: play_stable
+      dust_contamination: play_elevated_friction
+      sensor_artifact: direct_indirect_disagree
+      structural_loosening: play_stable
+      environmental_transient: play_stable
+      software_threshold_artifact: play_stable
+      unknown_other: inconclusive
+    gate_actions:
+      play_at_or_over_limit: "Confirmed wear: restrict to critical-only mitigated flights; bearing replacement at Sol 320"
+      play_stable: "Bearing retired as primary cause; continue triage on remaining branches"
+      play_elevated_friction: "Lubrication flush; recheck after service"
+      direct_indirect_disagree: "Sensing chain suspect: prioritize sensor cross-check"
+      inconclusive: "Repeat with arm-mounted dial procedure"
+
+  - id: imaging_inspection_blades
+    name: Blade + hub imaging inspection
+    description: >-
+      High-resolution onboard-camera survey of all four blades and the hub area; ground-team
+      image analysis for chips, erosion progression, or debris (per MA-005/MA-010 procedure).
+    duration_sols: 1
+    required_expertise: [blade_erosion, composite_materials, rotor_dynamics]
+    estimated_cost_usd: 5000
+    expected_outcomes:
+      bearing_degradation: blades_nominal
+      blade_erosion: erosion_progressed
+      fod_impact: visible_impact_damage
+      dust_contamination: dust_accumulation_visible
+      sensor_artifact: blades_nominal
+      structural_loosening: blades_nominal
+      environmental_transient: blades_nominal
+      software_threshold_artifact: blades_nominal
+      unknown_other: inconclusive
+    gate_actions:
+      erosion_progressed: "Size against RT-105 spec; envelope restriction or blade-set replacement (MSRH-RA-001)"
+      visible_impact_damage: "Margin analysis per ANM-006; restrict altitude over sandy terrain"
+      dust_accumulation_visible: "Dust purge + seal kit (MSRH-GN-002) service"
+      blades_nominal: "Blades retired as cause; continue triage"
+      inconclusive: "Re-image at different sun angle"
+
+  - id: sensor_cross_check
+    name: IMU / accelerometer cross-check
+    description: >-
+      Compare primary vibration channel against redundant IMU axes and the nav-camera
+      blur metric across recent flights; replay F47 telemetry through the v2.2.0 pipeline.
+    duration_sols: 1
+    required_expertise: [sensor_fusion, telemetry_analysis, sensor_calibration, avionics]
+    estimated_cost_usd: 6000
+    expected_outcomes:
+      bearing_degradation: channels_agree
+      blade_erosion: channels_agree
+      fod_impact: channels_agree
+      dust_contamination: channels_agree
+      sensor_artifact: channels_disagree
+      structural_loosening: channels_agree
+      environmental_transient: channels_agree
+      software_threshold_artifact: channels_agree
+      unknown_other: inconclusive
+    gate_actions:
+      channels_agree: "Vibration is real: proceed on mechanical branches"
+      channels_disagree: "Recalibrate per MA-007; consider IMU replacement (MSRH-AV-001)"
+      inconclusive: "Instrument next ground spin with dual-channel capture"
+
+  - id: software_threshold_audit
+    name: Software / threshold audit
+    description: >-
+      Testbed replay of the v2.2.1 patch (MA-009): verify alert arithmetic, compare F47
+      amplitude against BOTH thresholds (0.186 g current, 0.20 g original), and diff the
+      processing pipeline v2.2.0 → v2.2.1.
+    duration_sols: 1
+    required_expertise: [flight_control_software, real_time_systems]
+    estimated_cost_usd: 4000
+    expected_outcomes:
+      bearing_degradation: alert_logic_correct
+      blade_erosion: alert_logic_correct
+      fod_impact: alert_logic_correct
+      dust_contamination: alert_logic_correct
+      sensor_artifact: processing_defect_found
+      structural_loosening: alert_logic_correct
+      environmental_transient: alert_logic_correct
+      software_threshold_artifact: processing_defect_found
+      unknown_other: inconclusive
+    gate_actions:
+      alert_logic_correct: "Software retired as cause; alert stands"
+      processing_defect_found: "Patch defect: fix, testbed-verify, uplink; clear grounding if amplitude re-computes nominal"
+      inconclusive: "Extend replay window to Flights 38–47"
+
+  - id: lubrication_response_test
+    name: Lubrication service + response test
+    description: >-
+      Apply an on-hand MSRH-GN-001 lubricant cartridge via robotic arm (per RT-204), then
+      repeat the ground-spin spectrum. Amplitude recovery isolates lubricant degradation
+      from mechanical wear — and doubles as the primary in-situ mitigation.
+    duration_sols: 2
+    required_expertise: [bearing_systems, rotor_dynamics, vibration_analysis]
+    estimated_cost_usd: 9000
+    expected_outcomes:
+      bearing_degradation: partial_or_full_recovery
+      blade_erosion: no_change
+      fod_impact: no_change
+      dust_contamination: full_recovery
+      sensor_artifact: no_change
+      structural_loosening: no_change
+      environmental_transient: no_change
+      software_threshold_artifact: no_change
+      unknown_other: inconclusive
+    gate_actions:
+      partial_or_full_recovery: "Lubricant-dominated wear: mitigated critical-only flights viable; bearing swap at Sol 320"
+      full_recovery: "Contamination cleared: monitor every flight; resume critical-only"
+      no_change: "Mechanical wear or non-bearing cause: hold flights pending remaining branches"
+      inconclusive: "Repeat spin at higher RPM"
+
+  - id: fastener_torque_imaging
+    name: Fastener / mount imaging survey
+    description: >-
+      High-resolution imaging of rotor-mast fasteners, sensor mounts, and landing-gear
+      interfaces; frame-difference against Sol 200 baseline imagery for migration marks.
+    duration_sols: 1
+    required_expertise: [structural_analysis, failure_analysis, FMEA]
+    estimated_cost_usd: 5000
+    expected_outcomes:
+      bearing_degradation: mounts_nominal
+      blade_erosion: mounts_nominal
+      fod_impact: mounts_nominal
+      dust_contamination: mounts_nominal
+      sensor_artifact: sensor_mount_shift
+      structural_loosening: fastener_migration_visible
+      environmental_transient: mounts_nominal
+      software_threshold_artifact: mounts_nominal
+      unknown_other: inconclusive
+    gate_actions:
+      fastener_migration_visible: "Robotic-arm retorque procedure; re-run spin test"
+      sensor_mount_shift: "Re-seat sensor mount; recalibrate per MA-007"
+      mounts_nominal: "Structure retired as cause"
+      inconclusive: "Re-image with raking light at dawn"

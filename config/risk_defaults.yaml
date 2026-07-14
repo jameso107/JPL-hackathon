@@ -1,0 +1,113 @@
+# Asserted mission-risk inputs. Every value carries a citation string rendered in the UI.
+# These are deliberate, fixed engineering-judgment defaults (Decision Log #9): no live
+# editing in v1. Computed inputs (delay cost, parts, margins) come from mission files.
+
+nominal_per_flight_lov:
+  value: 0.002
+  citation: "Engineering judgment anchored on Ingenuity: 72 flights, no loss; qualification reserve applied"
+
+vehicle_loss_penalty_usd:
+  value: 750000000
+  citation: "Placeholder: MSRH replacement + program slip (engineering-judgment placeholder, config-editable)"
+
+sample_shortfall_penalty_usd:
+  value: 150000000
+  citation: "Placeholder: unique science value per uncached batch-3 sample (engineering-judgment placeholder)"
+
+# Per-flight P(loss of vehicle) under hypothesis × flight profile.
+# Profiles: nominal (fly as planned), mitigated (reduced RPM, shortened profile, warm-window,
+# post-lubrication), post_service (after in-situ service + ground-spin verification), grounded.
+lov_per_flight:
+  bearing_degradation:
+    nominal:      { per_flight: 0.040, citation: "ANM-010: bearing seizure is the credible end state; play at 87.5% of limit" }
+    mitigated:    { per_flight: 0.015, citation: "Reduced RPM/duration cuts bearing load; ANM-003 60%-life learning" }
+    post_service: { per_flight: 0.008, citation: "Fresh lubricant + verified spectrum before committing to flight" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  blade_erosion:
+    nominal:      { per_flight: 0.015, citation: "ANM-006 precedent: blade damage within margin, continued flying" }
+    mitigated:    { per_flight: 0.008, citation: "Reduced RPM lowers blade loading" }
+    post_service: { per_flight: 0.008, citation: "Service does not repair blades; same as mitigated" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  fod_impact:
+    nominal:      { per_flight: 0.012, citation: "ANM-006: structural margin held after strike; unknown residual damage" }
+    mitigated:    { per_flight: 0.006, citation: "Altitude/terrain restrictions reduce re-strike and load" }
+    post_service: { per_flight: 0.006, citation: "Imaging clears gross damage before flight" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  dust_contamination:
+    nominal:      { per_flight: 0.010, citation: "ANM-001 self-cleared, but ANM-012 shows dust can bind mechanisms" }
+    mitigated:    { per_flight: 0.005, citation: "Lubrication flush reduces contaminant load" }
+    post_service: { per_flight: 0.003, citation: "Post-flush spectrum verification" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  sensor_artifact:
+    nominal:      { per_flight: 0.004, citation: "Vehicle healthy; residual risk of masking a real fault" }
+    mitigated:    { per_flight: 0.003, citation: "Near-nominal; conservative margin for masked faults" }
+    post_service: { per_flight: 0.003, citation: "Near-nominal; cross-check reduces masking risk" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  structural_loosening:
+    nominal:      { per_flight: 0.025, citation: "Loose joints can cascade under full load (engineering judgment)" }
+    mitigated:    { per_flight: 0.012, citation: "Reduced RPM lowers dynamic amplification" }
+    post_service: { per_flight: 0.010, citation: "Imaging/torque survey partially retires risk" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  environmental_transient:
+    nominal:      { per_flight: 0.006, citation: "Hardware nominal; gust exposure persists (fly warm, low-wind windows)" }
+    mitigated:    { per_flight: 0.004, citation: "Wind-window constraint applied" }
+    post_service: { per_flight: 0.004, citation: "Same as mitigated" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  software_threshold_artifact:
+    nominal:      { per_flight: 0.003, citation: "Vehicle healthy; alert logic issue only" }
+    mitigated:    { per_flight: 0.003, citation: "Near-nominal" }
+    post_service: { per_flight: 0.003, citation: "Near-nominal" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+  unknown_other:
+    nominal:      { per_flight: 0.030, citation: "Unmodeled cause: conservative reserve (engineering judgment)" }
+    mitigated:    { per_flight: 0.015, citation: "Generic load reduction assumed half-effective" }
+    post_service: { per_flight: 0.012, citation: "Ground verification partially retires unknowns" }
+    grounded:     { per_flight: 0.0005, citation: "Dormancy risk only" }
+
+# Action catalog. Flight lists are resolved against the mission timeline at runtime:
+# critical = priority "critical" flights (incl. dependent transports); full = all scheduled.
+actions:
+  ground_until_resupply:
+    name: "Ground until Sol 320 resupply + bearing replacement"
+    summary: >-
+      Keep MSRH grounded until the upper bearing assembly (MSRH-RA-002) arrives at Sol 320,
+      replace via robotic arm, run the 3-flight verification campaign, then resume.
+    lov_profile: grounded
+    prep_delay_sols: 0
+    mitigations:
+      - "Order MSRH-RA-002 on the Sol 320 resupply manifest ($35K slot fee)"
+      - "Bearing replacement + dust seal kit (MSRH-GN-002) on arrival"
+      - "3-flight verification campaign (~$85K) before resuming the manifest"
+  fly_critical_only_mitigated:
+    name: "Fly critical-only (F48/F49, F51/F52) with mitigations"
+    summary: >-
+      Fly only the four critical-path flights needed to bank samples ST-17 and ST-19, under
+      reduced RPM, shortened profiles, warm-window scheduling, and a fresh lubrication service.
+    lov_profile: mitigated
+    prep_delay_sols: 5
+    mitigations:
+      - "Lubrication service using on-hand MSRH-GN-001 cartridge before first flight"
+      - "Reduced rotor RPM and shortened flight profiles"
+      - "Warm-window (midday) flights only; wind limit 8 m/s"
+      - "Every-flight vibration review before releasing the next flight"
+  resume_full_manifest:
+    name: "Resume full manifest (all six flights)"
+    summary: >-
+      Close the review and fly all six scheduled flights as planned, accepting elevated risk
+      under the degradation hypotheses.
+    lov_profile: nominal
+    prep_delay_sols: 3
+    mitigations:
+      - "Every-flight vibration trend review"
+  mitigation_service_then_reassess:
+    name: "In-situ mitigation service, diagnose, then fly critical-only"
+    summary: >-
+      Run the triage plan first: lubrication service + ground-spin spectrum + imaging, then
+      commit the four critical flights under post-service constraints.
+    lov_profile: post_service
+    prep_delay_sols: 8
+    mitigations:
+      - "Lubrication service (MSRH-GN-001) + dust purge before spin test"
+      - "Ground rotor-spin spectral run gates the return to flight"
+      - "Blade + fastener imaging survey"
+      - "Critical-only manifest after gate passes; reduced RPM retained"

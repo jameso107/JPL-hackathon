@@ -1,0 +1,228 @@
+# Hypothesis library — vibration category.
+# LRs are per canonical pattern tag (see src/types/evidence.ts PatternTag).
+# lr > 1 supports the hypothesis, lr < 1 argues against, absent = 1.0 (neutral).
+# Citations render in the UI next to every waterfall bar.
+category: vibration
+hypotheses:
+  - id: bearing_degradation
+    name: Progressive rotor bearing degradation
+    description: >-
+      Upper/lower rotor bearing wear (lubricant degradation, dust-accelerated) raises
+      broadband vibration progressively with rotor hours, with accelerating growth near
+      end of life.
+    prior_keywords: [bearing, lubricant]
+    evidence_response:
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 6.0
+        citation: "ANM-013 heritage predictive model: vibration = f(bearing_play, rotor_hours, dust)"
+      - pattern: bearing_play_near_limit
+        lr: 8.0
+        citation: "MA-008/MA-010 measured play progression toward 0.004 mm spec limit"
+      - pattern: maintenance_wear_progression
+        lr: 3.0
+        citation: "Monotonic play growth across MA-002 → MA-008 → MA-010"
+      - pattern: gradual_onset_multi_flight
+        lr: 2.5
+        citation: "ANM-003: progressive over 5 flights on Ingenuity"
+      - pattern: sudden_onset_single_flight
+        lr: 0.3
+        citation: "Bearing wear rarely presents as a single-flight step change"
+      - pattern: acute_departure_from_trend
+        lr: 1.5
+        citation: "End-of-life bearing wear accelerates (ANM-003 progression profile)"
+      - pattern: vibration_exceedance
+        lr: 1.2
+        citation: "Exceedance expected under any mechanical degradation"
+      - pattern: trend_projection_reaches_threshold
+        lr: 1.5
+        citation: "Wear-rate projection consistent with threshold crossing"
+    diagnostics:
+      [ground_spin_spectrum, bearing_play_measurement, lubrication_response_test]
+    repair_options:
+      - bearing_replacement (MSRH-RA-002/003; upper NOT at Mars depot, resupply Sol 320)
+      - lubrication_service (MSRH-GN-001 cartridges, 3 at depot)
+
+  - id: blade_erosion
+    name: Rotor blade leading-edge erosion / blade fatigue
+    description: >-
+      Progressive blade-surface erosion (documented on Blades 2 and 4) altering the
+      aerodynamic balance and raising once-per-rev vibration.
+    prior_keywords: [erosion, blade fatigue]
+    evidence_response:
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 3.0
+        citation: "MA-005/MA-010: Blade 2 and Blade 4 erosion progressing with usage"
+      - pattern: gradual_onset_multi_flight
+        lr: 2.0
+        citation: "Erosion is cumulative across flights"
+      - pattern: acute_departure_from_trend
+        lr: 1.3
+        citation: "Material loss can step when a surface layer detaches"
+      - pattern: vibration_exceedance
+        lr: 1.2
+        citation: "Imbalance raises vibration amplitude"
+      - pattern: sudden_onset_single_flight
+        lr: 0.7
+        citation: "Erosion alone rarely steps in a single flight"
+    diagnostics: [imaging_inspection_blades, ground_spin_spectrum]
+    repair_options:
+      - blade_set_replacement (MSRH-RA-001; 1 at Mars depot)
+      - flight_envelope_restriction
+
+  - id: fod_impact
+    name: Foreign-object debris impact / acute blade damage
+    description: >-
+      Rock or debris strike (e.g. lofted by rotor downwash) chipping a blade during
+      Flight 47, producing an abrupt vibration step.
+    prior_keywords: [fod, foreign object, debris impact]
+    evidence_response:
+      - pattern: sudden_onset_single_flight
+        lr: 5.0
+        citation: "ANM-006: Ingenuity blade chip after high-wind flight"
+      - pattern: gradual_onset_multi_flight
+        lr: 0.4
+        citation: "FOD does not explain a 40-flight progressive trend"
+      - pattern: acute_departure_from_trend
+        lr: 2.0
+        citation: "Impact damage presents as a step above the wear trend"
+      - pattern: high_wind_during_anomaly
+        lr: 1.5
+        citation: "ANM-006: downwash-lofted debris more likely in high wind over loose terrain"
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 0.6
+        citation: "Pre-existing trend argues the dominant cause predates F47"
+    diagnostics: [imaging_inspection_blades, ground_spin_spectrum]
+    repair_options:
+      - blade_set_replacement (MSRH-RA-001)
+      - continue_with_margin_analysis (per ANM-006 precedent)
+
+  - id: dust_contamination
+    name: Dust ingestion / rotor hub contamination
+    description: >-
+      Dust accumulation in the rotor hub or bearing seals raising friction and vibration;
+      historically self-clearing (ANM-001).
+    prior_keywords: [dust ingestion, hub contamination]
+    evidence_response:
+      - pattern: gradual_onset_multi_flight
+        lr: 1.5
+        citation: "Dust accumulates across flights (ANM-001)"
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 1.2
+        citation: "Exposure grows with operation, but ANM-001 self-cleared in 2 flights"
+      - pattern: acute_departure_from_trend
+        lr: 1.2
+        citation: "Ingestion events can be episodic"
+      - pattern: high_wind_during_anomaly
+        lr: 1.4
+        citation: "High wind raises airborne dust load"
+    diagnostics: [ground_spin_spectrum, imaging_inspection_blades]
+    repair_options:
+      - dust_seal_replacement (MSRH-GN-002, 2 at depot)
+      - lubrication_service_flush (MSRH-GN-001)
+
+  - id: sensor_artifact
+    name: Vibration sensor / IMU measurement artifact
+    description: >-
+      Accelerometer drift, mounting resonance, or processing artifact inflating reported
+      amplitude without real mechanical change. NOTE: MA-008/MA-010 bearing-play values are
+      inferred FROM vibration data, so this hypothesis would also contaminate those readings.
+    prior_keywords: [sensor artifact, accelerometer, calibration drift]
+    evidence_response:
+      - pattern: recent_software_change
+        lr: 1.5
+        citation: "MA-007/MA-009: recent calibration + threshold patch touch the sensing chain"
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 0.5
+        citation: "A physically coherent fleet-wide wear trend argues the sensor reads real physics"
+      - pattern: exceeds_original_threshold
+        lr: 1.0
+        citation: "Neutral: artifact magnitude unconstrained by threshold history"
+    diagnostics: [sensor_cross_check, ground_spin_spectrum, software_threshold_audit]
+    repair_options:
+      - imu_recalibration (per MA-007 procedure)
+      - imu_module_replacement (MSRH-AV-001, 1 at depot)
+
+  - id: structural_loosening
+    name: Structural fastener / mount loosening
+    description: >-
+      Progressive loosening of rotor-mast or sensor-mount fasteners under vibration and
+      thermal cycling, amplifying transmitted vibration.
+    prior_keywords: [fastener, loosening, mounting]
+    evidence_response:
+      - pattern: gradual_onset_multi_flight
+        lr: 1.5
+        citation: "Loosening is progressive under thermal/vibration cycling"
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 1.5
+        citation: "Load cycles accumulate with rotor hours"
+      - pattern: acute_departure_from_trend
+        lr: 1.5
+        citation: "Joints can let go abruptly past a preload threshold"
+      - pattern: vibration_exceedance
+        lr: 1.2
+        citation: "Reduced stiffness amplifies response"
+    diagnostics: [fastener_torque_imaging, ground_spin_spectrum]
+    repair_options:
+      - fastener_retorque_via_robotic_arm
+      - structural_imaging_survey
+
+  - id: environmental_transient
+    name: Environmental transient (wind gust / turbulence)
+    description: >-
+      Atmospheric turbulence or gust loading during Flight 47 producing a transient
+      aerodynamic vibration with no hardware degradation.
+    prior_keywords: [wind gust, turbulence, environmental]
+    evidence_response:
+      - pattern: high_wind_during_anomaly
+        lr: 2.5
+        citation: "F47 flew at 11.9 m/s — tied for fleet-maximum wind"
+      - pattern: confounder_unexplained_residual
+        lr: 0.15
+        citation: "Regression: wind/temp/RPM/duration do not explain the residual; F23 flew identical wind at 0.148 g"
+      - pattern: confounder_explains_anomaly
+        lr: 5.0
+        citation: "Emitted only when environmental covariates DO explain the anomaly"
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 0.4
+        citation: "A 40-flight monotonic trend is not environmental"
+      - pattern: sudden_onset_single_flight
+        lr: 2.0
+        citation: "Transients present as single-flight events"
+      - pattern: gradual_onset_multi_flight
+        lr: 0.6
+        citation: "Progressive onset argues against a one-off transient"
+    diagnostics: [ground_spin_spectrum, sensor_cross_check]
+    repair_options:
+      - none_required_if_confirmed (add wind-margin flight rule)
+
+  - id: software_threshold_artifact
+    name: Software / alert-threshold artifact
+    description: >-
+      The v2.2.1 patch (MA-009) lowered the alert threshold from 0.20 g to 0.186 g;
+      hypothesis that the alarm — not the vibration — is the anomaly.
+    prior_keywords: [threshold artifact, software artifact, false alert]
+    evidence_response:
+      - pattern: recent_software_change
+        lr: 2.5
+        citation: "MA-009 threshold patch applied 13 sols before the anomaly"
+      - pattern: exceeds_original_threshold
+        lr: 0.2
+        citation: "0.22 g exceeds even the ORIGINAL 0.20 g threshold — the alert is not an artifact of the lowered limit"
+      - pattern: monotonic_trend_vs_rotor_hours
+        lr: 0.5
+        citation: "Measured amplitude trend spans 46 flights, predating the patch"
+    diagnostics: [software_threshold_audit, sensor_cross_check]
+    repair_options:
+      - threshold_rollback_and_testbed_replay
+      - none_required_if_confirmed
+
+  - id: unknown_other
+    name: Unknown / other
+    description: >-
+      Catch-all for causes outside the library. Retains reserved prior mass; receives no
+      likelihood updates.
+    prior_keywords: []
+    evidence_response: []
+    diagnostics: [ground_spin_spectrum]
+    repair_options: []
+    is_catch_all: true

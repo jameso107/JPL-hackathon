@@ -1,0 +1,18 @@
+# Analytics + Bayes engine parameters (deterministic; every default is a visible choice).
+analytics:
+  baseline_window_flights: 10
+  default_alert_threshold_g: 0.186     # fallback — extracted from MA-009 notes when present
+  default_original_threshold_g: 0.20   # fallback — extracted from MA-009 notes when present
+  default_bearing_play_limit_mm: 0.004 # fallback — extracted from MA-008 notes when present
+  bearing_play_near_limit_ratio: 0.8
+  recent_software_change_sols: 30
+  wind_twin_tolerance_ms: 0.5
+  trend_min_t_stat: 3.0
+  historical_match_top_k: 3
+
+bayes:
+  laplace_alpha: 1.0
+  reserved_unknown_mass: 0.05
+  # Global soft-evidence exponent: hedges against LR overconfidence / residual
+  # double-counting between correlated evidence items (log-linear pooling).
+  tempering: 0.7

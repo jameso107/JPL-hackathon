@@ -1,0 +1,85 @@
+{
+  "current_sol": 245,
+  "helicopter_status": "GROUNDED_ANOMALY_REVIEW",
+  "scheduled_flights": [
+    {
+      "flight_id": "F48",
+      "sol": 250,
+      "objective": "sample_retrieval",
+      "target_site": "Jezero Delta Site C",
+      "priority": "critical",
+      "dependency": "None",
+      "notes": "Retrieves cached sample tube ST-17. Required for Earth-return batch 3.",
+      "estimated_duration_min": 3.5,
+      "status": "HOLD_PENDING_ANOMALY_REVIEW"
+    },
+    {
+      "flight_id": "F49",
+      "sol": 258,
+      "objective": "cache_transport",
+      "target_site": "Cache Depot Alpha",
+      "priority": "critical",
+      "dependency": "F48 completion",
+      "notes": "Transports ST-17 to depot for pickup by sample return lander.",
+      "estimated_duration_min": 4.0,
+      "status": "HOLD_PENDING_ANOMALY_REVIEW"
+    },
+    {
+      "flight_id": "F50",
+      "sol": 265,
+      "objective": "reconnaissance",
+      "target_site": "Midway Ridge",
+      "priority": "high",
+      "dependency": "None",
+      "notes": "Scout terrain for Prospector-B traverse planning. Imaging run.",
+      "estimated_duration_min": 2.5,
+      "status": "HOLD_PENDING_ANOMALY_REVIEW"
+    },
+    {
+      "flight_id": "F51",
+      "sol": 275,
+      "objective": "sample_retrieval",
+      "target_site": "Jezero Delta Site D",
+      "priority": "critical",
+      "dependency": "None",
+      "notes": "Retrieves cached sample tube ST-19. Last tube in Delta region.",
+      "estimated_duration_min": 3.8,
+      "status": "HOLD_PENDING_ANOMALY_REVIEW"
+    },
+    {
+      "flight_id": "F52",
+      "sol": 285,
+      "objective": "cache_transport",
+      "target_site": "Cache Depot Alpha",
+      "priority": "critical",
+      "dependency": "F51 completion",
+      "notes": "Transports ST-19 to depot.",
+      "estimated_duration_min": 4.2,
+      "status": "HOLD_PENDING_ANOMALY_REVIEW"
+    },
+    {
+      "flight_id": "F53",
+      "sol": 295,
+      "objective": "site_survey",
+      "target_site": "Syrtis Basin Rim",
+      "priority": "medium",
+      "dependency": "None",
+      "notes": "Evaluate potential extended mission science targets.",
+      "estimated_duration_min": 3.0,
+      "status": "HOLD_PENDING_ANOMALY_REVIEW"
+    }
+  ],
+  "earth_return_window": {
+    "window_open_sol": 380,
+    "window_close_sol": 410,
+    "samples_required": 6,
+    "samples_cached": 4,
+    "samples_pending_retrieval": 2,
+    "pending_sample_flights": [
+      "F48",
+      "F51"
+    ]
+  },
+  "delay_cost_per_sol_usd": 285000,
+  "notes": "Flights F48 and F51 are on the critical path for Earth-return batch 3. Total delay budget before window close: 135 sols from current sol. However, sample curing time at depot requires minimum 60 sols before launch, effectively reducing margin to 75 sols."
+}

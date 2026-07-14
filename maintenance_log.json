@@ -1,0 +1,102 @@
+[
+  {
+    "action_id": "MA-001",
+    "sol": 95,
+    "date_utc": "2028-02-08",
+    "action": "Pre-flight systems checkout",
+    "subsystem": "all",
+    "technician": "Chen, Wei",
+    "notes": "All systems nominal. Rotor blade visual inspection passed. Firmware v2.1.3 confirmed.",
+    "duration_hours": 2.0
+  },
+  {
+    "action_id": "MA-002",
+    "sol": 120,
+    "date_utc": "2028-03-05",
+    "action": "Bearing lubrication service",
+    "subsystem": "rotor_assembly",
+    "technician": "Chen, Wei",
+    "notes": "Scheduled 500-hour service. Bearing play within spec (0.002mm). Lubricant applied per procedure RT-204.",
+    "duration_hours": 1.5
+  },
+  {
+    "action_id": "MA-003",
+    "sol": 135,
+    "date_utc": "2028-03-20",
+    "action": "Software update",
+    "subsystem": "flight_computer",
+    "technician": "Nakamura, Yuki",
+    "notes": "Updated flight control software to v2.2.0. Includes improved vibration dampening algorithm. Ground-tested successfully.",
+    "duration_hours": 3.0
+  },
+  {
+    "action_id": "MA-004",
+    "sol": 158,
+    "date_utc": "2028-04-12",
+    "action": "Solar panel cleaning",
+    "subsystem": "power",
+    "technician": "Chen, Wei",
+    "notes": "Dust accumulation reducing charge efficiency by ~8%. Cleaned with compressed gas. Post-cleaning efficiency restored to 97%.",
+    "duration_hours": 1.0
+  },
+  {
+    "action_id": "MA-005",
+    "sol": 180,
+    "date_utc": "2028-05-04",
+    "action": "Rotor blade inspection",
+    "subsystem": "rotor_assembly",
+    "technician": "Rodriguez, Maria",
+    "notes": "Scheduled 1000-cycle inspection. Microscopic edge erosion noted on Blade 2 leading edge \u2014 within acceptable limits per spec RT-105. Recommended monitoring at next inspection.",
+    "duration_hours": 2.5
+  },
+  {
+    "action_id": "MA-006",
+    "sol": 195,
+    "date_utc": "2028-05-19",
+    "action": "Battery health check",
+    "subsystem": "power",
+    "technician": "Chen, Wei",
+    "notes": "Battery capacity at 94% of original. Degradation curve tracking nominal. No action required.",
+    "duration_hours": 1.0
+  },
+  {
+    "action_id": "MA-007",
+    "sol": 210,
+    "date_utc": "2028-06-03",
+    "action": "Avionics sensor calibration",
+    "subsystem": "avionics",
+    "technician": "Nakamura, Yuki",
+    "notes": "IMU drift correction applied. Altimeter recalibrated. Nav camera alignment verified.",
+    "duration_hours": 2.0
+  },
+  {
+    "action_id": "MA-008",
+    "sol": 225,
+    "date_utc": "2028-06-18",
+    "action": "Bearing inspection",
+    "subsystem": "rotor_assembly",
+    "technician": "Rodriguez, Maria",
+    "notes": "Unscheduled inspection following Flight 38 vibration note. Bearing play measured at 0.003mm \u2014 approaching upper spec limit of 0.004mm. Lubrication refreshed. Recommended: plan bearing replacement at next resupply window.",
+    "duration_hours": 3.5
+  },
+  {
+    "action_id": "MA-009",
+    "sol": 232,
+    "date_utc": "2028-06-25",
+    "action": "Software patch",
+    "subsystem": "flight_computer",
+    "technician": "Nakamura, Yuki",
+    "notes": "Patch v2.2.1 applied to adjust vibration monitoring thresholds based on MA-008 findings. Alert threshold lowered from 0.20g to 0.186g.",
+    "duration_hours": 1.5
+  },
+  {
+    "action_id": "MA-010",
+    "sol": 240,
+    "date_utc": "2028-07-03",
+    "action": "Rotor blade inspection",
+    "subsystem": "rotor_assembly",
+    "technician": "Rodriguez, Maria",
+    "notes": "Follow-up to MA-005. Blade 2 leading edge erosion has progressed slightly but remains within spec. Blade 4 shows initial signs of similar erosion. Bearing play at 0.0035mm. Recommend bearing replacement before Flight 55.",
+    "duration_hours": 2.5
+  }
+]

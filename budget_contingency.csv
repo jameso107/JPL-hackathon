@@ -1,0 +1,7 @@
+category,allocated_usd,spent_usd,remaining_usd,notes
+personnel_overtime,450000,187000,263000,Anomaly review requires ~$12K/day in overtime for core team
+spare_parts,800000,234000,566000,Bearing assembly cost: $142K (upper) + $138K (lower). Not currently at Mars depot.
+mission_operations,1200000,890000,310000,Daily ops cost: $285K/sol. Grounding extends burn without productive flights.
+testing_verification,300000,95000,205000,Post-repair flight test sequence: estimated $85K for 3-flight verification campaign
+schedule_reserve,500000,0,500000,Management reserve for schedule delays. Each sol of delay costs $285K in ops.
+transportation_logistics,200000,142000,58000,Resupply manifest slot: $35K reservation fee. Next window Sol 320.

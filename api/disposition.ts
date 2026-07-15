@@ -99,6 +99,17 @@ async function handleDisposition(rawBody: unknown): Promise<DispositionResponse>
   if (!baseUrl || !apiKey || !model) {
     return { status: 503, body: { error: 'llm_unconfigured' } };
   }
+  // A masked copy-paste (••••) puts non-ASCII chars in the key and the fetch
+  // header building then fails with a cryptic ByteString error — say it plainly.
+  if (!/^[\x21-\x7e]+$/.test(apiKey.trim())) {
+    return {
+      status: 503,
+      body: {
+        error:
+          'CHATHPC_API_KEY contains non-ASCII characters (looks like a masked "•••" copy-paste) — re-enter the real key',
+      },
+    };
+  }
 
   let body: { payload?: unknown; retry?: RetryInfo };
   if (typeof rawBody === 'string') {

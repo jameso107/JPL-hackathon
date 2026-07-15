@@ -60,6 +60,17 @@ export async function handleDispositionRequest(
   if (cfg === null) {
     return { status: 503, body: { error: 'llm_unconfigured' } };
   }
+  // A masked copy-paste (••••) puts non-ASCII chars in the key and the fetch
+  // header building then fails with a cryptic ByteString error — say it plainly.
+  if (!/^[\x21-\x7e]+$/.test(cfg.apiKey.trim())) {
+    return {
+      status: 503,
+      body: {
+        error:
+          'CHATHPC_API_KEY contains non-ASCII characters (looks like a masked "•••" copy-paste) — re-enter the real key',
+      },
+    };
+  }
 
   let body: DispositionRequestBody;
   if (typeof rawBody === 'string') {

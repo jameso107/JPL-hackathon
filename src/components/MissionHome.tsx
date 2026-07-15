@@ -12,6 +12,7 @@ import {
 import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { useAppStore } from '../state/store';
+import MappingDialog from './MappingDialog';
 import { fmtPct } from './shared/format';
 import { DEGRADATION, ROLE_LABELS } from './shared/names';
 import { Badge, NoticeRow, Section, StatTile } from './shared/ui';
@@ -128,7 +129,10 @@ function FleetStrip() {
 function SourceStatus() {
   const model = useAppStore((s) => s.model);
   const unrecognized = useAppStore((s) => s.unrecognized);
+  const lastFiles = useAppStore((s) => s.lastFiles);
+  const [mappingTarget, setMappingTarget] = useState<string | null>(null);
   if (!model && unrecognized.length === 0) return null;
+  const targetFile = lastFiles.find((f) => f.name === mappingTarget);
   return (
     <Section title="Source files" icon={<Database size={13} />}>
       <ul className="divide-y divide-slate-800/70">
@@ -149,9 +153,17 @@ function SourceStatus() {
             <span className="font-mono text-xs text-slate-400">{name}</span>
             <Badge tone="warning">unrecognized</Badge>
             <span className="text-[11px] text-slate-500">matched no schema-mapping profile</span>
+            <button
+              type="button"
+              onClick={() => setMappingTarget(name)}
+              className="ml-auto rounded border border-sky-500/50 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-sky-300 transition-colors hover:bg-sky-500/20"
+            >
+              map columns…
+            </button>
           </li>
         ))}
       </ul>
+      {targetFile && <MappingDialog file={targetFile} onClose={() => setMappingTarget(null)} />}
     </Section>
   );
 }

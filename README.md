@@ -126,5 +126,11 @@ every other file adds capability per the degradation matrix in `docs/CONTRACTS.m
   commit your own diagnosis, then graded against the computed posteriors).
   Terrain is a procedural Jezero-flavored stand-in; bake a real HiRISE DTM with
   `scripts/bake_dem.py` to swap in actual Jezero relief.
-- **Phase 3:** Review-board packet export; LLM-assisted schema mapping for
-  unfamiliar files.
+- **Phase 3 (done):** **Export tab** — one-click Review Board Packet (executive
+  summary, evidence table with provenance, posteriors + log-odds waterfalls,
+  decision comparison with cited assumptions, gated triage plan, caveats) as
+  Markdown or self-contained HTML, with client-side PDF via the print dialog;
+  works fully offline through the deterministic narrative fallback. Plus
+  **unfamiliar-file schema mapping**: unrecognized files get a "map columns…"
+  dialog that builds a runtime profile and re-ingests — an unfamiliar telemetry
+  CSV dispositions end-to-end (LLM-suggested mappings remain a stretch item).

@@ -118,8 +118,13 @@ function candidateKeys(format: MappingProfile['format'], analysis: FileAnalysis)
   return null;
 }
 
-function matchProfile(file: RawFile, analysis: FileAnalysis): MappingProfile | null {
-  const profiles = schemaMappings.profiles;
+function matchProfile(
+  file: RawFile,
+  analysis: FileAnalysis,
+  extraProfiles: MappingProfile[],
+): MappingProfile | null {
+  // user-confirmed runtime profiles (mapping dialog) take precedence over config
+  const profiles = [...extraProfiles, ...schemaMappings.profiles];
   // (a) filename match
   for (const profile of profiles) {
     if (profile.filePatterns.some((p) => filenameMatches(p, file.name))) return profile;
@@ -203,7 +208,7 @@ interface Collected {
   budget?: { records: BudgetLine[]; source: SourceFileInfo };
 }
 
-export function ingestFiles(files: RawFile[]): IngestResult {
+export function ingestFiles(files: RawFile[], extraProfiles: MappingProfile[] = []): IngestResult {
   const notices: IngestNotice[] = [];
   const unrecognized: string[] = [];
   const collected: Collected = {};
@@ -212,7 +217,7 @@ export function ingestFiles(files: RawFile[]): IngestResult {
   for (const file of files) {
     try {
       const analysis = analyzeFile(file);
-      const profile = matchProfile(file, analysis);
+      const profile = matchProfile(file, analysis, extraProfiles);
       if (!profile) {
         unrecognized.push(file.name);
         notices.push({

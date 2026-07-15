@@ -31,6 +31,7 @@ import type {
   DecisionAnalysis,
   EvidencePackage,
   IngestNotice,
+  MappingProfile,
   MissionModel,
   NarrativeRequest,
   NarrativeResult,
@@ -38,7 +39,7 @@ import type {
   TriagePlan,
 } from '../types';
 
-export type TabId = 'home' | 'workbench' | 'decision' | 'triage' | 'flightdeck';
+export type TabId = 'home' | 'workbench' | 'decision' | 'triage' | 'flightdeck' | 'export';
 
 export interface AppState {
   // inputs
@@ -47,6 +48,10 @@ export interface AppState {
   unrecognized: string[];
   /** dataset roles absent from the ingested model → degraded capabilities */
   missingRoles: DatasetRole[];
+  /** the raw file set behind the current model — re-ingested when a manual mapping is confirmed */
+  lastFiles: RawFile[];
+  /** user-confirmed runtime mapping profiles (mapping dialog) */
+  customProfiles: MappingProfile[];
   // derived artifacts (null until a model with telemetry is loaded)
   evidence: EvidencePackage | null;
   bayes: BayesResult | null;
@@ -64,6 +69,8 @@ export interface AppState {
   // actions
   loadDemo: () => void;
   ingestBrowserFiles: (files: File[]) => Promise<void>;
+  /** confirm a mapping-dialog profile and re-ingest the current file set with it */
+  applyManualMapping: (profile: MappingProfile) => void;
   generateNarrative: () => Promise<void>;
   setActiveTab: (tab: TabId) => void;
   selectEvidence: (id: string | null) => void;
@@ -108,7 +115,7 @@ const EMPTY_SLICE: DerivedSlice = {
  * The full synchronous derivation pipeline. Never throws: every stage failure
  * becomes an error notice and nulls the artifact + downstream artifacts.
  */
-function deriveFromFiles(files: RawFile[]): DerivedSlice {
+function deriveFromFiles(files: RawFile[], extraProfiles: MappingProfile[] = []): DerivedSlice {
   const notices: IngestNotice[] = [];
   let model: MissionModel | null = null;
   let unrecognized: string[] = [];
@@ -120,7 +127,7 @@ function deriveFromFiles(files: RawFile[]): DerivedSlice {
 
   // Stage 0: ingest (contractually never throws — but stay defensive anyway).
   try {
-    const result = ingestFiles(files);
+    const result = ingestFiles(files, extraProfiles);
     model = result.model;
     unrecognized = result.unrecognized;
     missingRoles = result.missingRoles;
@@ -215,9 +222,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
   ...EMPTY_SLICE,
   activeTab: 'home',
   evidenceFocusNonce: 0,
+  lastFiles: [],
+  customProfiles: [],
 
   loadDemo: () => {
-    set(deriveFromFiles(msrhDemoFiles));
+    set({ ...deriveFromFiles(msrhDemoFiles, get().customProfiles), lastFiles: msrhDemoFiles });
   },
 
   ingestBrowserFiles: async (files: File[]) => {
@@ -238,8 +247,26 @@ export const useAppStore = create<AppState>()((set, get) => ({
       set({ notices: [...get().notices, ...readFailures] });
       return;
     }
-    const derived = deriveFromFiles(raw);
-    set({ ...derived, notices: [...readFailures, ...derived.notices] });
+    const derived = deriveFromFiles(raw, get().customProfiles);
+    set({ ...derived, notices: [...readFailures, ...derived.notices], lastFiles: raw });
+  },
+
+  applyManualMapping: (profile: MappingProfile) => {
+    const { lastFiles, customProfiles } = get();
+    // replace any earlier mapping for the same file/id, newest wins
+    const profiles = [profile, ...customProfiles.filter((p) => p.id !== profile.id)];
+    const derived = deriveFromFiles(lastFiles, profiles);
+    set({
+      ...derived,
+      customProfiles: profiles,
+      notices: [
+        {
+          level: 'info',
+          message: `manual mapping "${profile.id}" applied (role ${profile.role}) — file set re-ingested`,
+        },
+        ...derived.notices,
+      ],
+    });
   },
 
   generateNarrative: async () => {
@@ -275,5 +302,5 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   selectHypothesis: (id) => set({ selectedHypothesisId: id }),
 
-  reset: () => set({ ...EMPTY_SLICE, activeTab: 'home' }),
+  reset: () => set({ ...EMPTY_SLICE, activeTab: 'home', lastFiles: [], customProfiles: [] }),
 }));

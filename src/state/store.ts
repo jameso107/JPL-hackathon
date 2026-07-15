@@ -83,6 +83,8 @@ export interface AppState {
   selectedHypothesisId: string | null;
   /** bumped on every selectEvidence call so the stream re-scrolls even for a re-click */
   evidenceFocusNonce: number;
+  /** bumped on every (re-)ingest — async AI completions no-op if it changed mid-flight */
+  ingestNonce: number;
   // guided story mode (step definitions live in UI config, not the store)
   storyActive: boolean;
   storyStep: number;
@@ -260,6 +262,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   narrativeAudience: 'board',
   askOpen: false,
   evidenceFocusNonce: 0,
+  ingestNonce: 0,
   lastFiles: [],
   customProfiles: [],
   storyActive: false,
@@ -273,6 +276,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       ...derived,
       lastFiles: msrhDemoFiles,
       activeTab: derived.bayes ? 'briefing' : 'home',
+      ingestNonce: get().ingestNonce + 1,
     });
   },
 
@@ -300,6 +304,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       notices: [...readFailures, ...derived.notices],
       lastFiles: raw,
       activeTab: derived.bayes ? 'briefing' : 'home',
+      ingestNonce: get().ingestNonce + 1,
     });
   },
 
@@ -319,6 +324,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         ...derived.notices,
       ],
       activeTab: derived.bayes ? 'briefing' : 'home',
+      ingestNonce: get().ingestNonce + 1,
     });
   },
 
@@ -334,6 +340,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       vehicle: model?.meta.vehicle ?? 'MSRH',
       audience: narrativeAudience,
     };
+    const epoch = get().ingestNonce;
     set({ narrativeLoading: true });
     let result: NarrativeResult;
     try {
@@ -346,14 +353,29 @@ export const useAppStore = create<AppState>()((set, get) => ({
         error: messageOf(err),
       };
     }
-    // A focused regenerate swaps in only that section, preserving the rest of
-    // the current narrative (the model returns empty arrays for other fields).
+    // The dataset was re-ingested while we awaited — this narrative is for a
+    // superseded model; drop it (re-ingest already reset narrative/loading).
+    if (get().ingestNonce !== epoch) return;
     const prev = get().narrative;
     if (opts?.focus === 'executiveSummary' && prev) {
+      // A focused regenerate refines ONE section. Keep the prior result's outer
+      // metadata (status, dropped-proposal count) — those describe the narrative
+      // as a whole, still the prior generation — and swap in the new summary
+      // only when the model actually produced one; on fallback keep the old
+      // summary and surface the error, rather than silently showing a
+      // deterministic summary under the prior "ChatHPC narrative" badge.
+      const fellBack = result.status === 'fallback';
       set({
         narrative: {
-          ...result,
-          narrative: { ...prev.narrative, executiveSummary: result.narrative.executiveSummary },
+          ...prev,
+          status: fellBack ? 'fallback' : prev.status,
+          error: fellBack ? result.error : prev.error,
+          narrative: {
+            ...prev.narrative,
+            executiveSummary: fellBack
+              ? prev.narrative.executiveSummary
+              : result.narrative.executiveSummary,
+          },
         },
         narrativeLoading: false,
       });
@@ -385,6 +407,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       vehicle: model?.meta.vehicle ?? 'MSRH',
     };
     const history = qaMessages;
+    const epoch = get().ingestNonce;
     // Append the user turn immediately; mark loading.
     set({ qaMessages: [...qaMessages, { role: 'user', text: question }], qaLoading: true });
     let answer: QaTurn;
@@ -400,6 +423,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
         error: messageOf(err),
       };
     }
+    // The dataset was re-ingested mid-flight — this answer (and its citations)
+    // belong to a superseded model; drop it instead of appending an orphan turn
+    // (re-ingest already cleared qaMessages/qaLoading for the new dataset).
+    if (get().ingestNonce !== epoch) return;
     set((s) => ({ qaMessages: [...s.qaMessages, answer], qaLoading: false }));
   },
 
@@ -424,5 +451,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       customProfiles: [],
       storyActive: false,
       storyStep: 0,
+      ingestNonce: get().ingestNonce + 1,
     }),
 }));

@@ -8,7 +8,7 @@
  * narrative adapter, the model narrates — it never does arithmetic and never
  * invents an evidence id.
  */
-import type { NarrativeRequest, QaTurn } from '../../types';
+import type { NarrativeRequest, QaAnswer, QaTurn } from '../../types';
 import { postLlm } from './index';
 import { buildCompactPayload } from './payload';
 import {
@@ -35,9 +35,7 @@ function collectCitedIds(answer: string, cited: string[]): string[] {
   return [...cited, ...inline];
 }
 
-type QaParse =
-  | { ok: true; answer: string; citedEvidence: string[]; outsideAnalysis: boolean }
-  | { ok: false; error: string };
+type QaParse = ({ ok: true } & QaAnswer) | { ok: false; error: string };
 
 function parseQaContent(content: string, validIds: Set<string>): QaParse {
   let raw: unknown;

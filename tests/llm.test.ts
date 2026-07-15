@@ -616,6 +616,25 @@ describe('requestNarrative', () => {
     expect(result.droppedProposals).toBe(1);
   });
 
+  it('threads task, audience, and focus into the proxy body', async () => {
+    const content = '```json\n' + JSON.stringify(validNarrative()) + '\n```';
+    const fetchMock = vi.fn(async () => mockResponse({ body: { content } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const req = { ...makeRequest(), audience: 'engineer' as const };
+    await requestNarrative(req, { focus: 'executiveSummary' });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string }];
+    const sent = JSON.parse(init.body) as {
+      task?: string;
+      audience?: string;
+      focus?: string;
+    };
+    expect(sent.task).toBe('disposition');
+    expect(sent.audience).toBe('engineer');
+    expect(sent.focus).toBe('executiveSummary');
+  });
+
   it('retries once with the previous response + zod error, then succeeds (llm_retry)', async () => {
     const good = JSON.stringify(validNarrative());
     const fetchMock = vi

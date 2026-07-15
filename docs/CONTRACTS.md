@@ -439,6 +439,33 @@ without distinguishingTest dropped & counted; fallback narrative is schema-valid
 only real EV ids, and mentions the top hypothesis; mock fetch (vi.stubGlobal) for the
 retry-then-fallback path (no real network).
 
+**v3 additions — one task-discriminated route, two prose-only features.** `/api/disposition`
+now takes an optional `task` (`'disposition'` default | `'ask'`) selecting the system prompt;
+the Express dev proxy and the (deliberately dependency-free) Vercel mirror both assemble the
+request via `buildRequest(body)` → `{ messages, temperature, maxTokens }`. Absent `task` ⇒
+disposition, so older callers are unaffected. Same key-custody, retry, timeout, and graceful
+fallback as above. The hard fence is unchanged: the model narrates and cites; it never computes.
+- **Ask TRIAGE** (`src/reasoning/llm/qa.ts` `askQuestion(req, question, history)`): posts
+  `{ task:'ask', payload, question, history }`, zod-validates `qaAnswerSchema`
+  (`{ answer, citedEvidence[], outsideAnalysis }`), sanitizes cited ids (array ∪ inline `[EV-..]`)
+  to real EV ids, one corrective retry, then a deterministic grounded fallback turn. The compact
+  payload is extended with `sensitivityNotes` + per-hypothesis `matchedEvidence` so "why not X?"
+  and "what-if" are answerable from the artifact; what-if is qualitative and points at the
+  deterministic sensitivity notes — never a new number.
+- **Deeper narrative:** `NarrativeRequest.audience` (`'board'|'engineer'`) tunes the prompt via an
+  additive audience clause; `requestNarrative(req, { focus:'executiveSummary' })` regenerates one
+  section (the store merges only that field, preserving the rest and the prior result metadata);
+  a UI elapsed timer covers the 30–90 s reasoning wait.
+- **Store guard:** async AI completions capture `ingestNonce` and no-op if the dataset was
+  re-ingested mid-flight (no stale/orphan turns, no citations against a superseded model). QA
+  state (`qaMessages`/`qaLoading`) resets on every re-ingest; `narrativeAudience`/`askOpen` persist
+  until `reset()`.
+
+Constants (current): disposition temp 0.2 / max_tokens 4000; QA temp 0.3 / max_tokens 1200;
+upstream timeout 120 s, client timeout 150 s (reasoning model is slow). `api/disposition.ts` is
+self-contained (zero imports) — the cross-dir extensionless import was the Vercel cold-start crash;
+apply logic changes to BOTH it and `server/{prompt,upstream}.ts`.
+
 ---
 
 ## §Store/UI — owner: ui agent

@@ -73,6 +73,9 @@ export interface AppState {
   selectedHypothesisId: string | null;
   /** bumped on every selectEvidence call so the stream re-scrolls even for a re-click */
   evidenceFocusNonce: number;
+  // guided story mode (step definitions live in UI config, not the store)
+  storyActive: boolean;
+  storyStep: number;
   // actions
   loadDemo: () => void;
   ingestBrowserFiles: (files: File[]) => Promise<void>;
@@ -82,6 +85,9 @@ export interface AppState {
   setActiveTab: (tab: TabId) => void;
   selectEvidence: (id: string | null) => void;
   selectHypothesis: (id: string | null) => void;
+  startStory: () => void;
+  exitStory: () => void;
+  setStoryStep: (step: number) => void;
   reset: () => void;
 }
 
@@ -231,6 +237,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   evidenceFocusNonce: 0,
   lastFiles: [],
   customProfiles: [],
+  storyActive: false,
+  storyStep: 0,
 
   loadDemo: () => {
     const derived = deriveFromFiles(msrhDemoFiles, get().customProfiles);
@@ -322,5 +330,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   selectHypothesis: (id) => set({ selectedHypothesisId: id }),
 
-  reset: () => set({ ...EMPTY_SLICE, activeTab: 'home', lastFiles: [], customProfiles: [] }),
+  startStory: () => set({ storyActive: true, storyStep: 0 }),
+  exitStory: () => set({ storyActive: false }),
+  setStoryStep: (step) => set({ storyStep: step }),
+
+  reset: () =>
+    set({
+      ...EMPTY_SLICE,
+      activeTab: 'home',
+      lastFiles: [],
+      customProfiles: [],
+      storyActive: false,
+      storyStep: 0,
+    }),
 }));

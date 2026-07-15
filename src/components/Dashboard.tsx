@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from 'react';
 import { useAppStore, type TabId } from '../state/store';
 import BriefingTab from './briefing/BriefingTab';
+import StoryOverlay from './story/StoryOverlay';
 import DecisionTab from './DecisionTab';
 import ExportTab from './ExportTab';
 import FlightDeck from './FlightDeck';
@@ -85,6 +86,8 @@ export default function Dashboard() {
         {activeTab === 'flightdeck' && <FlightDeck />}
         {activeTab === 'export' && <ExportTab />}
       </main>
+
+      <StoryOverlay />
 
       <footer className="mx-auto max-w-[1600px] px-4 pb-4">
         <p className="border-t border-slate-800/60 pt-2 text-[10px] leading-snug text-slate-600">

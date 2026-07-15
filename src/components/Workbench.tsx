@@ -28,14 +28,16 @@ export default function Workbench() {
       <Section
         title={`Evidence stream · ${evidence.items.length} items`}
         icon={<ScanSearch size={13} />}
+        id="evidence-stream"
         className="xl:h-[calc(100vh-140px)] xl:overflow-hidden [&>div]:h-[calc(100%-37px)]"
       >
         <EvidenceStream />
       </Section>
 
       <Section
-        title="Hypotheses · posterior ranked"
+        title="Causes · ranked by confidence"
         icon={<FlaskConical size={13} />}
+        id="hypothesis-rail"
         className="xl:h-[calc(100vh-140px)] xl:overflow-hidden [&>div]:h-[calc(100%-37px)]"
       >
         <HypothesisRail />

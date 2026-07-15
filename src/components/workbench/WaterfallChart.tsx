@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 import { useAppStore } from '../../state/store';
 import type { HypothesisPosterior, WaterfallStep } from '../../types';
-import { AXIS_LINE, AXIS_TICK, LegendRow, TipFrame, TipRow } from '../shared/charts';
+import { AXIS_LINE, AXIS_TICK, ChartCaption, LegendRow, TipFrame, TipRow } from '../shared/charts';
 import { fmtNum, fmtPct, fmtSigned, truncate } from '../shared/format';
 import { prettyTag } from '../shared/names';
 import { P } from '../shared/palette';
@@ -35,6 +35,13 @@ interface WfRow {
   span: [number, number];
 }
 
+/** Plain-language names for the structural steps (novice readability). */
+const STRUCTURAL_LABELS: Record<string, string> = {
+  prior: 'starting belief (history)',
+  normalization: 'rebalance to 100%',
+  posterior: 'final belief',
+};
+
 function buildRows(waterfall: WaterfallStep[]): WfRow[] {
   return waterfall.map((step, i) => {
     const isTotal = step.kind === 'prior' || step.kind === 'posterior';
@@ -43,7 +50,7 @@ function buildRows(waterfall: WaterfallStep[]): WfRow[] {
     const label =
       step.kind === 'evidence'
         ? `${step.evidenceId ?? ''} ${truncate(prettyTag(step.label), 26)}`.trim()
-        : step.kind;
+        : STRUCTURAL_LABELS[step.kind] ?? step.kind;
     return {
       key: `${i}|${label}`,
       label,
@@ -120,10 +127,21 @@ export function WaterfallChart({ posterior }: { posterior: HypothesisPosterior }
           <XAxis
             type="number"
             domain={[lo - pad, hi + pad]}
+            // Probability ticks on the log-probability axis: novices read
+            // "1% … 100%", the scale stays honest (announced in the caption).
+            ticks={[
+              Math.log(0.001),
+              Math.log(0.01),
+              Math.log(0.05),
+              Math.log(0.1),
+              Math.log(0.25),
+              Math.log(0.5),
+              0,
+            ].filter((t) => t >= lo - pad && t <= hi + pad)}
             tick={AXIS_TICK}
             tickLine={false}
             axisLine={AXIS_LINE}
-            tickFormatter={(v: number) => fmtNum(v)}
+            tickFormatter={(v: number) => fmtPct(Math.exp(v), Math.exp(v) < 0.02 ? 1 : 0)}
           />
           <YAxis
             type="category"
@@ -149,10 +167,10 @@ export function WaterfallChart({ posterior }: { posterior: HypothesisPosterior }
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <p className="mt-1 px-1 text-[10px] leading-snug text-slate-500">
-        x-axis: ln(probability) — 0 = certainty. prior → evidence shifts (w·τ·ln LR) →
-        normalization → posterior. Click an evidence bar to inspect it in the stream.
-      </p>
+      <ChartCaption
+        takeaway={`Evidence moved this cause from ${fmtPct(Math.exp(rows[0]?.cumulative ?? 0))} to ${fmtPct(posterior.posterior)}.`}
+        method="log-probability scale (each tick is a big step) · bars: starting belief → per-evidence pushes (w·τ·ln LR) → rebalance → final belief · click an evidence bar to inspect it"
+      />
     </div>
   );
 }

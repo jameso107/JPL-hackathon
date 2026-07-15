@@ -81,7 +81,17 @@ function StripChart({
             tickFormatter={(v: number) => fmtNum(v)}
           />
           {typeof threshold === 'number' && (
-            <ReferenceLine y={threshold} stroke={P.critical} strokeDasharray="4 3" />
+            <ReferenceLine
+              y={threshold}
+              stroke={P.critical}
+              strokeDasharray="4 3"
+              label={{
+                value: `alert ${fmtNum(threshold)}`,
+                position: 'insideTopRight',
+                fill: P.critical,
+                fontSize: 8,
+              }}
+            />
           )}
           <ReferenceLine x={playheadT} stroke={P.inkPrimary} strokeWidth={1} />
           <Line

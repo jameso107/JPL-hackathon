@@ -4,7 +4,7 @@
  * deep-link stat tiles, the two overview charts, the schedule strip, and the
  * pipeline journey. Everything links downward into the expert tabs.
  */
-import { Bot, FlaskConical, Loader2, ScanSearch, Timer } from 'lucide-react';
+import { Bot, FlaskConical, Loader2, Play, ScanSearch, Timer } from 'lucide-react';
 import { useAppStore } from '../../state/store';
 import EvidenceDrivers from '../overview/EvidenceDrivers';
 import PosteriorBars from '../overview/PosteriorBars';
@@ -137,7 +137,28 @@ export default function BriefingTab() {
 
       <NarrativeSummary />
 
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
+          how TRIAGE got here
+        </p>
+        <TourButton />
+      </div>
       <JourneyCards />
     </div>
+  );
+}
+
+function TourButton() {
+  const startStory = useAppStore((s) => s.startStory);
+  const storyActive = useAppStore((s) => s.storyActive);
+  if (storyActive) return null;
+  return (
+    <button
+      type="button"
+      onClick={startStory}
+      className="flex items-center gap-1.5 rounded border border-sky-500/40 bg-sky-500/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-sky-300 transition-colors hover:bg-sky-500/15"
+    >
+      <Play size={11} /> take the 60-second tour
+    </button>
   );
 }

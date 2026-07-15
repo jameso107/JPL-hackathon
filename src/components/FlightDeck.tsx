@@ -97,9 +97,13 @@ export default function FlightDeck() {
           </select>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
-          <Badge tone="warning">reconstructed from summary telemetry</Badge>
-          <Badge tone="neutral">procedural terrain — Jezero DEM pending</Badge>
+        <div className="ml-auto">
+          <Badge
+            tone="warning"
+            title="Flight paths and channel curves are parameterized from per-flight summary telemetry (recorded values are the anchors). Terrain is a procedural Mars-like stand-in until a real Jezero DEM is baked via scripts/bake_dem.py."
+          >
+            reconstructed · details on hover
+          </Badge>
         </div>
       </div>
 

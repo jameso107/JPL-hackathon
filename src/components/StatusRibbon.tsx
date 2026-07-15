@@ -4,6 +4,7 @@
  * Absorbs the old HeaderStatus. Chips render only when their artifact exists.
  */
 import { clsx } from 'clsx';
+import { Play } from 'lucide-react';
 import { useAppStore } from '../state/store';
 import { fmtPct, fmtUsd } from './shared/format';
 import { Badge } from './shared/ui';
@@ -53,6 +54,8 @@ export default function StatusRibbon() {
   const loading = useAppStore((s) => s.narrativeLoading);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const selectHypothesis = useAppStore((s) => s.selectHypothesis);
+  const startStory = useAppStore((s) => s.startStory);
+  const storyActive = useAppStore((s) => s.storyActive);
 
   if (!model) return null;
   const top = bayes?.posteriors[0];
@@ -99,6 +102,11 @@ export default function StatusRibbon() {
         <Badge tone={narrative.status === 'fallback' ? 'serious' : 'good'} title={narrative.error}>
           {narrative.status === 'fallback' ? 'deterministic mode' : 'ChatHPC narrative'}
         </Badge>
+      )}
+      {bayes && !storyActive && (
+        <Chip tone="sky" title="60-second guided walkthrough of the whole case" onClick={startStory}>
+          <Play size={10} /> guided tour
+        </Chip>
       )}
     </div>
   );

@@ -64,6 +64,29 @@ const asText = (value: unknown): string =>
 const truncate = (text: string, max = ERROR_TRUNCATE_CHARS): string =>
   text.length <= max ? text : text.slice(0, max);
 
+/** TLS trust codes that mean "Node doesn't trust this cert's CA" (JPL internal CA). */
+const CERT_TRUST_CODES = new Set([
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'CERT_UNTRUSTED',
+]);
+
+/** fetch() hides the real reason in err.cause; surface its code + message. */
+function describeFetchError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause instanceof Error) {
+    const code = (cause as { code?: string }).code;
+    if (code && CERT_TRUST_CODES.has(code)) {
+      return `${err.message}: ${code} — Node does not trust this server's CA (likely the JPL internal CA). Set NODE_EXTRA_CA_CERTS to the CA bundle (e.g. /etc/ssl/cert.pem) and restart.`;
+    }
+    return `${err.message}: ${code ? `${code} — ` : ''}${cause.message}`;
+  }
+  return err.message;
+}
+
 function buildMessages(payload: unknown, retry?: RetryInfo): ChatMessage[] {
   const messages: ChatMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -149,7 +172,7 @@ async function handleDisposition(rawBody: unknown): Promise<DispositionResponse>
     } catch (err) {
       const reason = controller.signal.aborted
         ? `upstream timeout after ${UPSTREAM_TIMEOUT_MS / 1000}s`
-        : `upstream request failed: ${err instanceof Error ? err.message : String(err)}`;
+        : `upstream request failed: ${describeFetchError(err)}`;
       return { status: 502, body: { error: truncate(reason) } };
     }
 

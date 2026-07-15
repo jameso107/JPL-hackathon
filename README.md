@@ -116,9 +116,15 @@ every other file adds capability per the degradation matrix in `docs/CONTRACTS.m
 
 ## Roadmap
 
-- **Phase 1 (this build):** ingest → analytics → Bayesian disposition → decision &
+- **Phase 1 (done):** ingest → analytics → Bayesian disposition → decision &
   triage → ChatHPC narrative, four dashboard tabs, golden-number test suite.
-- **Phase 2:** 3D Flight Deck (three.js) — fleet history colored by vibration,
-  labeled flight replay with scrubber, spot-the-anomaly mode, Jezero DEM terrain.
+- **Phase 2 (done):** 3D Flight Deck (three.js) — **Fleet History** (all 47
+  flights over Mars terrain, paths colored by vibration, mission-time scrubber),
+  **Flight Replay** (reconstructed profile, 0.25×–4× playback, synchronized strip
+  charts, threshold alarm on F47's final 30 s — always badged *RECONSTRUCTED FROM
+  SUMMARY TELEMETRY*), and **Spot the Anomaly** (severity colors hidden until you
+  commit your own diagnosis, then graded against the computed posteriors).
+  Terrain is a procedural Jezero-flavored stand-in; bake a real HiRISE DTM with
+  `scripts/bake_dem.py` to swap in actual Jezero relief.
 - **Phase 3:** Review-board packet export; LLM-assisted schema mapping for
   unfamiliar files.

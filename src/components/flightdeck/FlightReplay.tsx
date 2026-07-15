@@ -142,10 +142,15 @@ export default function FlightReplay({ reconstruction: r, alertThresholdG }: Fli
     markerRef.current = group;
     rotorRef.current = rotor;
 
-    // frame the flight: aim controls at the track midpoint
+    // frame the flight: aim at the track midpoint, distance scaled to track size
     const mid = r.path[Math.floor(r.path.length / 2)];
+    const radius = r.path.reduce(
+      (m, p) => Math.max(m, Math.hypot(p.x - mid.x, p.z - mid.z)),
+      60,
+    );
+    const d = Math.max(140, radius * 1.9);
     deck.controls.target.set(mid.x, mid.y, mid.z);
-    deck.camera.position.set(mid.x + 320, mid.y + 260, mid.z + 380);
+    deck.camera.position.set(mid.x + d * 0.55, mid.y + d * 0.6, mid.z + d * 0.75);
 
     tRef.current = 0;
     let chartAccum = 0;

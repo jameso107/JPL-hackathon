@@ -5,9 +5,11 @@
  */
 import { clsx } from 'clsx';
 import { Clapperboard, History, Puzzle } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { analyticsConfig } from '../config';
+import { loadJezeroTerrain } from '../scenes/heightfield';
 import { reconstructFlight } from '../scenes/reconstruct';
+import { setHeightfield } from '../scenes/terrain';
 import { useAppStore } from '../state/store';
 import FleetHistory from './flightdeck/FleetHistory';
 import FlightReplay from './flightdeck/FlightReplay';
@@ -27,6 +29,25 @@ export default function FlightDeck() {
   const evidence = useAppStore((s) => s.evidence);
   const [mode, setMode] = useState<DeckMode>('fleet');
   const [selectedFlight, setSelectedFlight] = useState<number | null>(null);
+  // Install the real Jezero DEM (if baked) BEFORE reconstructing flights, so the
+  // paths ride the true surface. Falls back to procedural terrain on failure.
+  const [terrainReady, setTerrainReady] = useState(false);
+  const [terrainReal, setTerrainReal] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void loadJezeroTerrain().then((t) => {
+      if (!alive) return;
+      if (t) {
+        setHeightfield(t.heightfield);
+        setTerrainReal(true);
+      }
+      setTerrainReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // threshold: prefer the analytics-extracted value, fall back to config
   const alertThresholdG = useMemo(() => {
@@ -40,7 +61,8 @@ export default function FlightDeck() {
         .slice()
         .sort((a, b) => a.flightNumber - b.flightNumber)
         .map((f) => reconstructFlight(f, alertThresholdG)),
-    [model, alertThresholdG],
+    // terrainReady flips heightAt from procedural → real DEM; rebuild paths then.
+    [model, alertThresholdG, terrainReady],
   );
 
   if (!model || reconstructions.length === 0) {
@@ -49,6 +71,16 @@ export default function FlightDeck() {
         title="No flights to display"
         body="Load telemetry to reconstruct and replay the fleet's flight history over terrain."
       />
+    );
+  }
+
+  if (!terrainReady) {
+    return (
+      <div className="flex h-[560px] items-center justify-center rounded-lg border border-slate-800 bg-slate-900/40">
+        <p className="animate-pulse font-mono text-xs uppercase tracking-[0.2em] text-slate-500">
+          reconstructing Jezero terrain…
+        </p>
+      </div>
     );
   }
 
@@ -99,10 +131,14 @@ export default function FlightDeck() {
 
         <div className="ml-auto">
           <Badge
-            tone="warning"
-            title="Flight paths and channel curves are parameterized from per-flight summary telemetry (recorded values are the anchors). Terrain is a procedural Mars-like stand-in until a real Jezero DEM is baked via scripts/bake_dem.py."
+            tone={terrainReal ? 'accent' : 'warning'}
+            title={
+              terrainReal
+                ? 'Terrain: real Jezero Crater elevation & imagery from the USGS Mars 2020 CTX DEM (NASA/JPL-Caltech/USGS), vertical exaggeration ~2.4×. Flight paths and channel curves are reconstructed from per-flight summary telemetry (recorded values are the anchors).'
+                : 'Flight paths and channel curves are parameterized from per-flight summary telemetry (recorded values are the anchors). Terrain is a procedural Mars-like stand-in (real Jezero DEM not baked).'
+            }
           >
-            reconstructed · details on hover
+            {terrainReal ? 'real Jezero terrain · paths reconstructed' : 'reconstructed · details on hover'}
           </Badge>
         </div>
       </div>

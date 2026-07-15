@@ -1,0 +1,36 @@
+{
+  "source": "NASA/JPL-Caltech/USGS \u2014 Mars 2020 CTX DEM & orthomosaic",
+  "credit": "Elevation & imagery: NASA/JPL-Caltech/USGS",
+  "sizeM": 10000.0,
+  "sizePx": 1024,
+  "heightMinM": -2651.04,
+  "heightMaxM": -2395.89,
+  "anchor": {
+    "lat_deg": 18.4446,
+    "lon_deg": 77.4509,
+    "note": "Octavia E. Butler Landing (origin)"
+  },
+  "hasTexture": true,
+  "landmarks": [
+    {
+      "name": "Octavia E. Butler Landing",
+      "x": 0.0,
+      "z": -0.0
+    },
+    {
+      "name": "Western delta",
+      "x": -2299.8,
+      "z": -1505.6
+    },
+    {
+      "name": "Kodiak butte",
+      "x": -1568.8,
+      "z": -972.1
+    },
+    {
+      "name": "Crater rim (NW)",
+      "x": -8485.1,
+      "z": -6247.6
+    }
+  ]
+}

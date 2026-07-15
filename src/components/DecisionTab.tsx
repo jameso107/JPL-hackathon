@@ -353,7 +353,8 @@ export default function DecisionTab() {
         title="Action comparison — the full table"
         icon={<Scale size={13} />}
         collapsible
-        defaultOpen
+        defaultOpen={false}
+        teaser={`all ${decision.actions.length} plans with delay, cost, loss risk, samples and margin — expand for the numbers`}
         id="action-table"
       >
         <div className="overflow-x-auto">

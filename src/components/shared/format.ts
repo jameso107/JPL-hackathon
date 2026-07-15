@@ -58,3 +58,25 @@ export function fmtSigned(v: number): string {
 export function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
+
+/** Compress a 1-based CSV row list into ranges: [2,3,4,5,48] → "2–5, 48". */
+export function fmtRowList(rows: number[]): string {
+  if (rows.length === 0) return '';
+  const sorted = [...rows].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (let i = 1; i <= sorted.length; i++) {
+    const cur = sorted[i];
+    if (cur === prev || cur === prev + 1) {
+      prev = cur;
+      continue;
+    }
+    parts.push(start === prev ? `${start}` : `${start}–${prev}`);
+    if (cur !== undefined) {
+      start = cur;
+      prev = cur;
+    }
+  }
+  return parts.join(', ');
+}

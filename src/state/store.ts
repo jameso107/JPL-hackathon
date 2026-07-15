@@ -39,7 +39,14 @@ import type {
   TriagePlan,
 } from '../types';
 
-export type TabId = 'home' | 'workbench' | 'decision' | 'triage' | 'flightdeck' | 'export';
+export type TabId =
+  | 'briefing'
+  | 'home'
+  | 'workbench'
+  | 'decision'
+  | 'triage'
+  | 'flightdeck'
+  | 'export';
 
 export interface AppState {
   // inputs
@@ -226,7 +233,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
   customProfiles: [],
 
   loadDemo: () => {
-    set({ ...deriveFromFiles(msrhDemoFiles, get().customProfiles), lastFiles: msrhDemoFiles });
+    const derived = deriveFromFiles(msrhDemoFiles, get().customProfiles);
+    // BLUF: a successful pipeline lands on the Briefing verdict; failures land
+    // on Data & Sources where the notices explain what went wrong.
+    set({
+      ...derived,
+      lastFiles: msrhDemoFiles,
+      activeTab: derived.bayes ? 'briefing' : 'home',
+    });
   },
 
   ingestBrowserFiles: async (files: File[]) => {
@@ -248,7 +262,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return;
     }
     const derived = deriveFromFiles(raw, get().customProfiles);
-    set({ ...derived, notices: [...readFailures, ...derived.notices], lastFiles: raw });
+    set({
+      ...derived,
+      notices: [...readFailures, ...derived.notices],
+      lastFiles: raw,
+      activeTab: derived.bayes ? 'briefing' : 'home',
+    });
   },
 
   applyManualMapping: (profile: MappingProfile) => {
@@ -266,6 +285,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         },
         ...derived.notices,
       ],
+      activeTab: derived.bayes ? 'briefing' : 'home',
     });
   },
 

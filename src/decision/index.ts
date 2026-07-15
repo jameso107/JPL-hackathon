@@ -580,6 +580,12 @@ export function runDecision(
     ),
   );
 
+  // Resupply sol for the missing critical part — surfaced (computed + cited)
+  // so UI timelines can annotate it without re-deriving inventory logic.
+  const resupplyPart = model.inventory?.find(
+    (p) => /bearing/i.test(p.description) && p.quantityMarsDepot === 0,
+  );
+
   return {
     actions,
     recommendedActionId: sorted[0].ctx.id,
@@ -588,6 +594,15 @@ export function runDecision(
       effectiveDeadlineSol: facts.effectiveDeadlineSol,
       marginSols: facts.marginSols,
       delayCostPerSolUsd: facts.delayCostPerSolUsd,
+      ...(resupplyPart
+        ? {
+            resupplySol: {
+              value: resupplyPart.nextResupplySol,
+              citation: `${sourceFileName(model, 'inventory', 'parts_inventory.csv')} ${resupplyPart.partNumber} next_resupply_sol`,
+              asserted: false,
+            },
+          }
+        : {}),
     },
     assertedInputs,
     sensitivityNotes,

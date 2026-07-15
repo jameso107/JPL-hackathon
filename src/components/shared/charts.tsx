@@ -1,6 +1,19 @@
-/** Shared Recharts chrome: axis styling, tooltip shell, legend row (dataviz-skill specs). */
+/** Shared Recharts chrome: axis styling, tooltip shell, legend row, chart
+ *  captions and the app-wide type tiers (dataviz-skill specs). */
 import type { ReactNode } from 'react';
 import { P } from './palette';
+
+// ---------------------------------------------------------------------------
+// Type tiers — the app-wide typographic hierarchy (apply consistently)
+// ---------------------------------------------------------------------------
+/** T1 — display number (verdict %, headline cost) */
+export const T1 = 'font-mono text-3xl font-semibold tabular-nums leading-none tracking-tight text-slate-100';
+/** T2 — section heading (matches Section header) */
+export const T2 = 'font-mono text-[11px] uppercase tracking-[0.18em] text-slate-400';
+/** T3 — body copy */
+export const T3 = 'text-xs leading-relaxed text-slate-300';
+/** T4 — caption / annotation */
+export const T4 = 'text-[10px] leading-snug text-slate-500';
 
 export const MONO_STACK = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 
@@ -43,6 +56,20 @@ export function TipRow({
       </span>
       <span className="font-mono tabular-nums text-slate-200">{value}</span>
     </p>
+  );
+}
+
+/**
+ * Every chart's caption: a bright plain-English TAKEAWAY (the conclusion,
+ * with numbers computed at render) over a recessive METHOD line (how it was
+ * computed). "One chart, one message."
+ */
+export function ChartCaption({ takeaway, method }: { takeaway: ReactNode; method?: ReactNode }) {
+  return (
+    <div className="mt-1.5 px-1">
+      <p className="text-[11px] font-medium leading-snug text-slate-200">{takeaway}</p>
+      {method && <p className="mt-0.5 text-[10px] leading-snug text-slate-500">{method}</p>}
+    </div>
   );
 }
 

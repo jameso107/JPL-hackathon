@@ -58,6 +58,8 @@ export interface DecisionAnalysis {
     effectiveDeadlineSol: CitedValue;
     marginSols: CitedValue;
     delayCostPerSolUsd: CitedValue;
+    /** next resupply sol for the missing critical part (from inventory), when known */
+    resupplySol?: CitedValue;
   };
   /** asserted config inputs surfaced for the UI (LOV table, penalties) with citations */
   assertedInputs: { label: string; value: string; citation: string }[];

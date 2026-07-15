@@ -4,55 +4,35 @@
  * all derived artifacts recompute reactively when inputs change.
  */
 import { clsx } from 'clsx';
-import { Activity, FileOutput, Home, Plane, Scale, Stethoscope } from 'lucide-react';
+import {
+  Activity,
+  Database,
+  FileOutput,
+  Gauge,
+  Plane,
+  Scale,
+  Stethoscope,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAppStore, type TabId } from '../state/store';
+import BriefingTab from './briefing/BriefingTab';
 import DecisionTab from './DecisionTab';
 import ExportTab from './ExportTab';
 import FlightDeck from './FlightDeck';
 import MissionHome from './MissionHome';
+import StatusRibbon from './StatusRibbon';
 import TriageTab from './TriageTab';
 import Workbench from './Workbench';
-import { Badge } from './shared/ui';
 
 const TABS: { id: TabId; label: string; icon: ReactNode }[] = [
-  { id: 'home', label: 'Mission Home', icon: <Home size={13} /> },
+  { id: 'briefing', label: 'Briefing', icon: <Gauge size={13} /> },
   { id: 'workbench', label: 'Anomaly Workbench', icon: <Activity size={13} /> },
   { id: 'decision', label: 'Decision Analysis', icon: <Scale size={13} /> },
   { id: 'triage', label: 'Triage Plan', icon: <Stethoscope size={13} /> },
   { id: 'flightdeck', label: 'Flight Deck', icon: <Plane size={13} /> },
   { id: 'export', label: 'Export', icon: <FileOutput size={13} /> },
+  { id: 'home', label: 'Data & Sources', icon: <Database size={13} /> },
 ];
-
-function HeaderStatus() {
-  const model = useAppStore((s) => s.model);
-  const narrative = useAppStore((s) => s.narrative);
-  const loading = useAppStore((s) => s.narrativeLoading);
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {model && (
-        <>
-          <Badge tone="accent">{model.meta.vehicle}</Badge>
-          {typeof model.meta.currentSol === 'number' && (
-            <span className="font-mono text-[11px] text-slate-400">Sol {model.meta.currentSol}</span>
-          )}
-          {model.timeline && /ground|hold/i.test(model.timeline.helicopterStatus) && (
-            <Badge tone="critical">{model.timeline.helicopterStatus.replace(/_/g, ' ')}</Badge>
-          )}
-        </>
-      )}
-      {loading && <Badge tone="accent">narrative…</Badge>}
-      {!loading && narrative && (
-        <Badge
-          tone={narrative.status === 'fallback' ? 'serious' : 'good'}
-          title={narrative.error}
-        >
-          {narrative.status === 'fallback' ? 'deterministic mode' : 'ChatHPC narrative'}
-        </Badge>
-      )}
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const activeTab = useAppStore((s) => s.activeTab);
@@ -71,7 +51,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="ml-auto">
-            <HeaderStatus />
+            <StatusRibbon />
           </div>
         </div>
         <nav className="mx-auto mt-3 flex max-w-[1600px] flex-wrap gap-1" role="tablist">
@@ -97,6 +77,7 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-[1600px] p-4">
+        {activeTab === 'briefing' && <BriefingTab />}
         {activeTab === 'home' && <MissionHome />}
         {activeTab === 'workbench' && <Workbench />}
         {activeTab === 'decision' && <DecisionTab />}

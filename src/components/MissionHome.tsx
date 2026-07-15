@@ -13,7 +13,7 @@ import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { useAppStore } from '../state/store';
 import MappingDialog from './MappingDialog';
-import { fmtPct } from './shared/format';
+import VibSparkline from './overview/VibSparkline';
 import { DEGRADATION, ROLE_LABELS } from './shared/names';
 import { Badge, NoticeRow, Section, StatTile } from './shared/ui';
 
@@ -110,9 +110,10 @@ function FleetStrip() {
       <StatTile
         label="Flights flown"
         value={model.telemetry.length}
+        spark={<VibSparkline width={96} height={28} />}
         sub={
           model.telemetry.length > 0
-            ? `latest F${model.telemetry[model.telemetry.length - 1].flightNumber}`
+            ? `latest F${model.telemetry[model.telemetry.length - 1].flightNumber} · spark: vibration trend`
             : undefined
         }
       />
@@ -133,8 +134,17 @@ function SourceStatus() {
   const [mappingTarget, setMappingTarget] = useState<string | null>(null);
   if (!model && unrecognized.length === 0) return null;
   const targetFile = lastFiles.find((f) => f.name === mappingTarget);
+  const totalRecords = model?.meta.sources.reduce((s, f) => s + f.recordCount, 0) ?? 0;
   return (
-    <Section title="Source files" icon={<Database size={13} />}>
+    <Section
+      title="Source files"
+      icon={<Database size={13} />}
+      collapsible
+      defaultOpen={!model || unrecognized.length > 0}
+      teaser={`${model?.meta.sources.length ?? 0} files recognized · ${totalRecords} records${
+        unrecognized.length > 0 ? ` · ${unrecognized.length} unrecognized` : ''
+      }`}
+    >
       <ul className="divide-y divide-slate-800/70">
         {model?.meta.sources.map((src) => (
           <li key={src.fileName} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
@@ -173,8 +183,16 @@ function Notices() {
   if (notices.length === 0) return null;
   const order = { error: 0, warning: 1, info: 2 } as const;
   const sorted = [...notices].sort((a, b) => order[a.level] - order[b.level]);
+  const errors = notices.filter((n) => n.level === 'error').length;
+  const warnings = notices.filter((n) => n.level === 'warning').length;
   return (
-    <Section title={`Ingest notices (${notices.length})`} icon={<ListChecks size={13} />}>
+    <Section
+      title={`Ingest notices (${notices.length})`}
+      icon={<ListChecks size={13} />}
+      collapsible
+      defaultOpen={errors > 0}
+      teaser={`${errors} errors · ${warnings} warnings · ${notices.length - errors - warnings} info`}
+    >
       <ul>
         {sorted.map((n, i) => (
           <NoticeRow key={`${n.level}-${i}-${n.message.slice(0, 24)}`} notice={n} />
@@ -204,35 +222,11 @@ function Degradation() {
   );
 }
 
-function PipelineHint() {
-  const bayes = useAppStore((s) => s.bayes);
-  const setActiveTab = useAppStore((s) => s.setActiveTab);
-  if (!bayes) return null;
-  const top = bayes.posteriors[0];
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
-      <Badge tone="good">pipeline complete</Badge>
-      <p className="text-xs text-slate-300">
-        Leading hypothesis: <span className="font-medium text-slate-100">{top?.name}</span>{' '}
-        <span className="font-mono text-emerald-400">{top ? fmtPct(top.posterior) : ''}</span>
-      </p>
-      <button
-        type="button"
-        onClick={() => setActiveTab('workbench')}
-        className="ml-auto rounded border border-emerald-500/40 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-emerald-400 transition-colors hover:bg-emerald-500/10"
-      >
-        Open Anomaly Workbench →
-      </button>
-    </div>
-  );
-}
-
 export default function MissionHome() {
   const model = useAppStore((s) => s.model);
   return (
     <div className="space-y-3">
       <FleetStrip />
-      <PipelineHint />
       <UploadZone />
       {!model && (
         <p className="text-center text-xs text-slate-500">

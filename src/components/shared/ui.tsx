@@ -1,9 +1,12 @@
-/** Small shared UI atoms: badges, chips, meters, empty states, stat tiles. */
+/** Small shared UI atoms: badges, chips, meters, empty states, stat tiles,
+ *  progressive-disclosure + plain-language primitives. */
 import { clsx } from 'clsx';
-import { AlertTriangle, Info, Radar, XCircle } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Info, Radar, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { EvidenceKind, IngestNotice } from '../../types';
 import { useAppStore } from '../../state/store';
+import { GLOSSARY, type GlossaryKey } from './glossary';
 import { KIND_COLORS } from './palette';
 
 // ---------------------------------------------------------------------------
@@ -125,6 +128,85 @@ export function Meter({
 }
 
 // ---------------------------------------------------------------------------
+// Plain-language pairing (glossary term)
+// ---------------------------------------------------------------------------
+
+/**
+ * Plain-English-first jargon pairing: "confidence · posterior" with the
+ * definition in a native tooltip. mode='plain' hides the jargon half,
+ * mode='jargon' keeps only the precise term (still tooltipped).
+ */
+export function Term({
+  k,
+  mode = 'pair',
+}: {
+  k: GlossaryKey;
+  mode?: 'pair' | 'plain' | 'jargon';
+}) {
+  const entry = GLOSSARY[k];
+  return (
+    <span
+      title={entry.definition}
+      className="cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2"
+    >
+      {mode !== 'jargon' && entry.plain}
+      {mode === 'pair' && <span className="text-slate-500"> · {entry.jargon}</span>}
+      {mode === 'jargon' && entry.jargon}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Progressive disclosure
+// ---------------------------------------------------------------------------
+
+/**
+ * Collapse-by-default container: a one-line teaser + chevron toggle. The
+ * workhorse of the "details on demand" layer — anything demoted from first
+ * view lives exactly one of these clicks away.
+ */
+export function Disclosure({
+  label,
+  teaser,
+  defaultOpen = false,
+  forceOpen = false,
+  children,
+  className,
+}: {
+  label: string;
+  teaser?: ReactNode;
+  defaultOpen?: boolean;
+  /** external open request (e.g. traceability jump into a collapsed group) */
+  forceOpen?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const isOpen = open || forceOpen;
+  return (
+    <div className={className}>
+      <button
+        type="button"
+        onClick={() => setOpen(!isOpen)}
+        aria-expanded={isOpen}
+        className="flex w-full items-center gap-1.5 py-1 text-left font-mono text-[10px] uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-300"
+      >
+        {isOpen ? (
+          <ChevronDown size={12} className="shrink-0" />
+        ) : (
+          <ChevronRight size={12} className="shrink-0" />
+        )}
+        {label}
+      </button>
+      {!isOpen && teaser && (
+        <p className="pl-[18px] text-[11px] leading-snug text-slate-500">{teaser}</p>
+      )}
+      {isOpen && <div className="pl-[18px] pt-1">{children}</div>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Section / panel scaffolding
 // ---------------------------------------------------------------------------
 
@@ -134,23 +216,54 @@ export function Section({
   right,
   children,
   className,
+  collapsible = false,
+  defaultOpen = true,
+  teaser,
+  id,
 }: {
   title: string;
   icon?: ReactNode;
   right?: ReactNode;
   children: ReactNode;
   className?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+  /** one-line summary shown in place of the body while collapsed */
+  teaser?: ReactNode;
+  /** DOM id — doubles as a story-mode / deep-link anchor */
+  id?: string;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const showBody = !collapsible || open;
   return (
-    <section className={clsx('rounded-lg border border-slate-800 bg-slate-900/60', className)}>
+    <section
+      id={id}
+      className={clsx('rounded-lg border border-slate-800 bg-slate-900/60', className)}
+    >
       <header className="flex items-center justify-between gap-2 border-b border-slate-800/80 px-3 py-2">
         <h2 className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-400">
           {icon}
           {title}
         </h2>
-        {right}
+        <span className="flex items-center gap-2">
+          {right}
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              className="font-mono text-[10px] uppercase tracking-wider text-slate-500 hover:text-slate-300"
+            >
+              {open ? 'collapse' : 'expand'}
+            </button>
+          )}
+        </span>
       </header>
-      <div className="p-3">{children}</div>
+      {showBody ? (
+        <div className="p-3">{children}</div>
+      ) : (
+        teaser && <div className="px-3 py-2 text-[11px] leading-snug text-slate-500">{teaser}</div>
+      )}
     </section>
   );
 }
@@ -209,36 +322,63 @@ export function StatTile({
   sub,
   tone,
   title,
+  onClick,
+  spark,
+  size = 'md',
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   tone?: BadgeTone;
   title?: string;
+  /** makes the tile a deep-link button */
+  onClick?: () => void;
+  /** optional word-sized chart (sparkline) rendered beside the value */
+  spark?: ReactNode;
+  /** md = classic tile; lg = T1 display number for verdict layers */
+  size?: 'md' | 'lg';
 }) {
+  const valueClass = clsx(
+    'mt-1 truncate font-semibold leading-tight',
+    size === 'lg' ? 'font-mono text-2xl tabular-nums tracking-tight' : 'text-lg',
+    tone === 'critical'
+      ? 'text-red-400'
+      : tone === 'warning'
+        ? 'text-amber-300'
+        : tone === 'good'
+          ? 'text-emerald-400'
+          : 'text-slate-100',
+  );
+  const body = (
+    <>
+      <p className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <div className="flex items-end justify-between gap-2">
+        <p className={valueClass}>{value}</p>
+        {spark && <div className="shrink-0 pb-0.5">{spark}</div>}
+      </div>
+      {sub && <p className="mt-0.5 truncate text-[11px] text-slate-500">{sub}</p>}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={title}
+        className="min-w-0 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-left transition-colors hover:border-sky-500/50 hover:bg-slate-900"
+      >
+        {body}
+      </button>
+    );
+  }
   return (
     <div
       className="min-w-0 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2.5"
       title={title}
     >
-      <p className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </p>
-      <p
-        className={clsx(
-          'mt-1 truncate text-lg font-semibold leading-tight',
-          tone === 'critical'
-            ? 'text-red-400'
-            : tone === 'warning'
-              ? 'text-amber-300'
-              : tone === 'good'
-                ? 'text-emerald-400'
-                : 'text-slate-100',
-        )}
-      >
-        {value}
-      </p>
-      {sub && <p className="mt-0.5 truncate text-[11px] text-slate-500">{sub}</p>}
+      {body}
     </div>
   );
 }

@@ -4,10 +4,47 @@
  * rationales with clickable EV citations, AI-proposed hypotheses, caveats.
  */
 import { Bot, Loader2, RefreshCw } from 'lucide-react';
+import { clsx } from 'clsx';
 import { useAppStore } from '../../state/store';
+import type { NarrativeAudience } from '../../types';
 import { truncate } from '../shared/format';
 import { hypName } from '../shared/names';
 import { Badge, Disclosure, EvChip } from '../shared/ui';
+import { useElapsedSeconds } from '../shared/useElapsedSeconds';
+
+const AUDIENCES: { id: NarrativeAudience; label: string; title: string }[] = [
+  { id: 'board', label: 'Board', title: 'plain, decision-first — for a program review board' },
+  { id: 'engineer', label: 'Engineer', title: 'technical, method-aware — for a subsystem engineer' },
+];
+
+/** Board ↔ engineer segmented toggle; switching re-narrates if a narrative exists. */
+function AudienceToggle() {
+  const audience = useAppStore((s) => s.narrativeAudience);
+  const setAudience = useAppStore((s) => s.setNarrativeAudience);
+  const loading = useAppStore((s) => s.narrativeLoading);
+  return (
+    <div className="inline-flex overflow-hidden rounded border border-slate-700" role="group" aria-label="narrative audience">
+      {AUDIENCES.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          disabled={loading}
+          onClick={() => setAudience(a.id)}
+          title={a.title}
+          aria-pressed={audience === a.id}
+          className={clsx(
+            'px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors disabled:opacity-50',
+            audience === a.id
+              ? 'bg-sky-500/15 text-sky-300'
+              : 'text-slate-500 hover:bg-slate-800/60 hover:text-slate-300',
+          )}
+        >
+          {a.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function StatusBadge() {
   const narrative = useAppStore((s) => s.narrative);
@@ -29,6 +66,7 @@ export default function NarrativePanel() {
   const loading = useAppStore((s) => s.narrativeLoading);
   const generate = useAppStore((s) => s.generateNarrative);
   const ready = useAppStore((s) => Boolean(s.evidence && s.bayes && s.decision && s.triage));
+  const elapsed = useElapsedSeconds(loading);
 
   const validIds = new Set(evidence?.items.map((i) => i.id) ?? []);
   const n = narrative?.narrative;
@@ -44,8 +82,13 @@ export default function NarrativePanel() {
           title={ready ? undefined : 'requires evidence, posteriors, decision and triage artifacts'}
         >
           {loading ? <Loader2 size={13} className="animate-spin" /> : narrative ? <RefreshCw size={13} /> : <Bot size={13} />}
-          {loading ? 'generating…' : narrative ? 'regenerate narrative' : 'generate narrative'}
+          {loading
+            ? `generating… ${elapsed > 0 ? `${elapsed}s` : ''}`
+            : narrative
+              ? 'regenerate narrative'
+              : 'generate narrative'}
         </button>
+        <AudienceToggle />
         <StatusBadge />
         {typeof narrative?.droppedProposals === 'number' && narrative.droppedProposals > 0 && (
           <span className="text-[10px] text-slate-500">
@@ -71,9 +114,20 @@ export default function NarrativePanel() {
       {n && (
         <div className="space-y-3">
           <div>
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-              executive summary
-            </p>
+            <div className="mb-1 flex items-center gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+                executive summary
+              </p>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void generate({ focus: 'executiveSummary' })}
+                title="regenerate just this summary (leaves the rest of the narrative in place)"
+                className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-slate-600 transition-colors enabled:hover:text-sky-300 disabled:opacity-40"
+              >
+                <RefreshCw size={9} className={loading ? 'animate-spin' : undefined} /> redo
+              </button>
+            </div>
             <p className="text-xs leading-relaxed text-slate-200">{n.executiveSummary}</p>
           </div>
 

@@ -3,8 +3,14 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildFallbackNarrative, requestNarrative } from '../src/reasoning/llm';
+import { askQuestion, buildFallbackAnswer } from '../src/reasoning/llm/qa';
 import { buildCompactPayload } from '../src/reasoning/llm/payload';
-import { dispositionNarrativeSchema, extractJson } from '../src/reasoning/llm/schema';
+import {
+  dispositionNarrativeSchema,
+  extractJson,
+  qaAnswerSchema,
+  sanitizeCitedEvidence,
+} from '../src/reasoning/llm/schema';
 import type {
   BayesResult,
   DecisionAnalysis,
@@ -22,14 +28,39 @@ import type {
 // tsc out of it; vitest resolves them at runtime through vite-node.
 // ---------------------------------------------------------------------------
 
+interface ChatMsg {
+  role: string;
+  content: string;
+}
+interface AssembledReq {
+  messages: ChatMsg[];
+  temperature: number;
+  maxTokens: number;
+}
+interface ProxyBody {
+  task?: 'disposition' | 'ask';
+  payload?: unknown;
+  audience?: 'board' | 'engineer';
+  focus?: 'executiveSummary';
+  retry?: { previousResponse?: unknown; zodError?: unknown };
+  question?: string;
+  history?: { role: 'user' | 'assistant'; text: string }[];
+}
+
 interface ServerPromptModule {
   SYSTEM_PROMPT: string;
+  QA_SYSTEM_PROMPT: string;
   TEMPERATURE: number;
   MAX_TOKENS: number;
+  QA_TEMPERATURE: number;
+  QA_MAX_TOKENS: number;
   buildMessages(
     payload: unknown,
     retry?: { previousResponse?: unknown; zodError?: unknown },
-  ): { role: string; content: string }[];
+    audience?: 'board' | 'engineer',
+    focus?: 'executiveSummary',
+  ): ChatMsg[];
+  buildRequest(body: ProxyBody): AssembledReq;
 }
 
 interface ServerUpstreamModule {
@@ -43,9 +74,16 @@ interface ServerUpstreamModule {
 
 const promptModulePath = '../server/prompt';
 const upstreamModulePath = '../server/upstream';
-const { SYSTEM_PROMPT, TEMPERATURE, MAX_TOKENS, buildMessages } = (await import(
-  promptModulePath
-)) as ServerPromptModule;
+const {
+  SYSTEM_PROMPT,
+  QA_SYSTEM_PROMPT,
+  TEMPERATURE,
+  MAX_TOKENS,
+  QA_TEMPERATURE,
+  QA_MAX_TOKENS,
+  buildMessages,
+  buildRequest,
+} = (await import(promptModulePath)) as ServerPromptModule;
 const { chatCompletionsUrl, truncate, handleDispositionRequest } = (await import(
   upstreamModulePath
 )) as ServerUpstreamModule;
@@ -419,8 +457,120 @@ describe('buildCompactPayload', () => {
     }
   });
 
+  it('carries sensitivity notes and per-hypothesis matched evidence for grounded Q&A', () => {
+    expect(payload.sensitivityNotes).toEqual(req.decision.sensitivityNotes);
+    const bearing = payload.hypotheses.find((h) => h.id === 'bearing_degradation');
+    expect(bearing?.matchedEvidence).toEqual(['EV-01', 'EV-02', 'EV-08']);
+    for (const h of payload.hypotheses) {
+      expect(Array.isArray(h.matchedEvidence)).toBe(true);
+    }
+  });
+
   it('stays compact (well under the 8K-token target)', () => {
     expect(JSON.stringify(payload).length).toBeLessThan(20000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Q&A schema + citation sanitization
+// ---------------------------------------------------------------------------
+
+describe('qaAnswerSchema', () => {
+  it('accepts a valid answer', () => {
+    const ok = qaAnswerSchema.safeParse({
+      answer: 'Bearing degradation leads because of the exceedance [EV-01].',
+      citedEvidence: ['EV-01'],
+      outsideAnalysis: false,
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it('rejects a missing outsideAnalysis flag', () => {
+    const bad = qaAnswerSchema.safeParse({ answer: 'x', citedEvidence: [] });
+    expect(bad.success).toBe(false);
+  });
+
+  it('rejects a non-string answer and a non-array citedEvidence', () => {
+    expect(qaAnswerSchema.safeParse({ answer: 42, citedEvidence: [], outsideAnalysis: false }).success).toBe(
+      false,
+    );
+    expect(
+      qaAnswerSchema.safeParse({ answer: 'x', citedEvidence: 'EV-01', outsideAnalysis: false }).success,
+    ).toBe(false);
+  });
+});
+
+describe('sanitizeCitedEvidence', () => {
+  const valid = new Set(['EV-01', 'EV-02', 'EV-08']);
+  it('filters unknown ids and de-dupes preserving order', () => {
+    expect(sanitizeCitedEvidence(['EV-08', 'EV-99', 'EV-01', 'EV-08'], valid)).toEqual([
+      'EV-08',
+      'EV-01',
+    ]);
+  });
+  it('returns empty for all-invalid input', () => {
+    expect(sanitizeCitedEvidence(['EV-99', 'nope'], valid)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// task-discriminated request assembly (server prompt)
+// ---------------------------------------------------------------------------
+
+describe('buildRequest task discriminator', () => {
+  it('assembles the disposition task by default (absent task) with narrative params', () => {
+    const r = buildRequest({ payload: { a: 1 } });
+    expect(r.temperature).toBe(TEMPERATURE);
+    expect(r.maxTokens).toBe(MAX_TOKENS);
+    expect(r.messages.map((m) => m.role)).toEqual(['system', 'user']);
+    expect(r.messages[0].content).toContain('NO ARITHMETIC');
+    expect(r.messages[1].content).toBe('{"a":1}');
+  });
+
+  it('assembles the ask task with the QA prompt, QA params, and the question last', () => {
+    const r = buildRequest({
+      task: 'ask',
+      payload: { a: 1 },
+      question: 'why not FOD?',
+      history: [
+        { role: 'user', text: 'earlier q' },
+        { role: 'assistant', text: 'earlier a' },
+      ],
+    });
+    expect(r.temperature).toBe(QA_TEMPERATURE);
+    expect(r.maxTokens).toBe(QA_MAX_TOKENS);
+    expect(r.messages[0].content).toBe(QA_SYSTEM_PROMPT);
+    expect(r.messages[0].content).toMatch(/NO ARITHMETIC/);
+    expect(r.messages[0].content).toMatch(/outsideAnalysis/);
+    // system, analysis-user, history(user+assistant), question-user
+    expect(r.messages.map((m) => m.role)).toEqual(['system', 'user', 'user', 'assistant', 'user']);
+    expect(r.messages[r.messages.length - 1].content).toBe('QUESTION: why not FOD?');
+  });
+
+  it('tunes the disposition system prompt per audience', () => {
+    const board = buildRequest({ task: 'disposition', payload: {}, audience: 'board' });
+    const engineer = buildRequest({ task: 'disposition', payload: {}, audience: 'engineer' });
+    expect(board.messages[0].content).toMatch(/REVIEW BOARD/);
+    expect(engineer.messages[0].content).toMatch(/ENGINEER/);
+    // no audience ⇒ byte-identical to the base prompt (backward compatible)
+    expect(buildRequest({ payload: {} }).messages[0].content).toBe(SYSTEM_PROMPT);
+  });
+
+  it('adds a single-section focus directive when focus is set', () => {
+    const focused = buildRequest({ task: 'disposition', payload: {}, focus: 'executiveSummary' });
+    expect(focused.messages[0].content).toMatch(/Regenerate ONLY the executiveSummary/);
+  });
+
+  it('appends the corrective retry turn for the ask task', () => {
+    const r = buildRequest({
+      task: 'ask',
+      payload: {},
+      question: 'q',
+      retry: { previousResponse: 'bad', zodError: 'oops' },
+    });
+    const roles = r.messages.map((m) => m.role);
+    expect(roles.slice(-2)).toEqual(['assistant', 'user']);
+    expect(r.messages[r.messages.length - 1].content).toMatch(/oops/);
   });
 });
 
@@ -750,5 +900,138 @@ describe('server upstream', () => {
   it('truncate caps at the requested length', () => {
     expect(truncate('abc', 500)).toBe('abc');
     expect(truncate('x'.repeat(600))).toHaveLength(500);
+  });
+
+  it('returns 400 when task="ask" is missing a question, without calling upstream', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const env = {
+      CHATHPC_BASE_URL: 'https://chathpc.example/v1',
+      CHATHPC_API_KEY: 'k',
+      CHATHPC_MODEL: 'm',
+    };
+    const res = await handleDispositionRequest({ task: 'ask', payload: { a: 1 } }, env);
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toMatch(/question/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('routes an ask request to the QA prompt with QA sampling params', async () => {
+    const fetchMock = vi.fn(async () =>
+      mockResponse({ body: { choices: [{ message: { content: '{"answer":"a","citedEvidence":[],"outsideAnalysis":false}' } }] } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const env = {
+      CHATHPC_BASE_URL: 'https://chathpc.example/v1',
+      CHATHPC_API_KEY: 'k',
+      CHATHPC_MODEL: 'm',
+    };
+    const res = await handleDispositionRequest(
+      { task: 'ask', payload: { a: 1 }, question: 'why not FOD?' },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [unknown, { body: string }];
+    const sent = JSON.parse(init.body) as {
+      temperature: number;
+      max_tokens: number;
+      messages: { role: string; content: string }[];
+    };
+    expect(sent.temperature).toBe(QA_TEMPERATURE);
+    expect(sent.max_tokens).toBe(QA_MAX_TOKENS);
+    expect(sent.messages[0].content).toBe(QA_SYSTEM_PROMPT);
+    expect(sent.messages[sent.messages.length - 1].content).toBe('QUESTION: why not FOD?');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// askQuestion (client) — grounded Q&A over the analysis
+// ---------------------------------------------------------------------------
+
+describe('askQuestion', () => {
+  function qaContent(answer: string, citedEvidence: string[], outsideAnalysis = false): string {
+    return JSON.stringify({ answer, citedEvidence, outsideAnalysis });
+  }
+
+  it('accepts a valid first answer and sanitizes cited ids (array + inline union, deduped)', async () => {
+    const content = qaContent(
+      'Bearing wins because of the exceedance [EV-01] and near-limit play [EV-08].',
+      ['EV-01', 'EV-99'], // EV-99 invalid → dropped; EV-08 only inline → collected
+    );
+    const fetchMock = vi.fn(async () => mockResponse({ body: { content } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const turn = await askQuestion(makeRequest(), 'why bearing?');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string }];
+    expect(url).toBe('/api/disposition');
+    const sent = JSON.parse(init.body) as { task?: string; question?: string; payload?: unknown };
+    expect(sent.task).toBe('ask');
+    expect(sent.question).toBe('why bearing?');
+    expect(JSON.stringify(sent.payload)).not.toContain('provenance');
+
+    expect(turn.role).toBe('assistant');
+    expect(turn.status).toBe('llm');
+    expect(turn.fallback).toBeUndefined();
+    expect(turn.citedEvidence).toEqual(['EV-01', 'EV-08']);
+  });
+
+  it('retries once on invalid output then succeeds (llm_retry)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse({ body: { content: 'not json' } }))
+      .mockResolvedValueOnce(mockResponse({ body: { content: qaContent('ok [EV-02]', ['EV-02']) } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const turn = await askQuestion(makeRequest(), 'explain');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(turn.status).toBe('llm_retry');
+    expect(turn.citedEvidence).toEqual(['EV-02']);
+    // the retry echoes the previous response + a zod error
+    const secondBody = JSON.parse((fetchMock.mock.calls[1][1] as { body: string }).body) as {
+      retry?: { previousResponse?: string };
+    };
+    expect(secondBody.retry?.previousResponse).toBe('not json');
+  });
+
+  it('falls back to a grounded, non-throwing answer on a network error', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const turn = await askQuestion(makeRequest(), 'why bearing?');
+    expect(turn.fallback).toBe(true);
+    expect(turn.status).toBe('fallback');
+    expect(turn.error).toContain('fetch failed');
+    expect(turn.text).toContain('Upper rotor bearing degradation');
+    expect(turn.text).toContain('72%');
+    // still cites only real EV ids
+    for (const id of turn.citedEvidence ?? []) {
+      expect(['EV-01', 'EV-02', 'EV-08']).toContain(id);
+    }
+  });
+
+  it('falls back immediately on a non-200 proxy response without retrying', async () => {
+    const fetchMock = vi.fn(async () => mockResponse({ status: 503, body: { error: 'llm_unconfigured' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const turn = await askQuestion(makeRequest(), 'q');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(turn.fallback).toBe(true);
+    expect(String(turn.error)).toContain('503');
+  });
+});
+
+describe('buildFallbackAnswer', () => {
+  it('is grounded, flags fallback, and cites only real EV ids', () => {
+    const req = makeRequest();
+    const turn = buildFallbackAnswer(req);
+    expect(turn.role).toBe('assistant');
+    expect(turn.fallback).toBe(true);
+    expect(turn.text).toContain('Upper rotor bearing degradation');
+    expect(turn.text).toContain('72%');
+    const realIds = new Set(req.evidence.items.map((i) => i.id));
+    for (const id of turn.citedEvidence ?? []) {
+      expect(realIds.has(id)).toBe(true);
+    }
   });
 });

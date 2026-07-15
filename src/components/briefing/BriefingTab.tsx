@@ -12,6 +12,7 @@ import {
   Database,
   FileOutput,
   FlaskConical,
+  MessageCircleQuestion,
   Play,
   Plane,
   Scale,
@@ -22,6 +23,7 @@ import PosteriorBars from '../overview/PosteriorBars';
 import VibSparkline from '../overview/VibSparkline';
 import { fmtPct, fmtUsd } from '../shared/format';
 import { Badge, EmptyState, StatTile } from '../shared/ui';
+import { useElapsedSeconds } from '../shared/useElapsedSeconds';
 import { confidencePhrase } from './confidence';
 
 function DrillLink({
@@ -57,6 +59,8 @@ export default function BriefingTab() {
   const startStory = useAppStore((s) => s.startStory);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const selectHypothesis = useAppStore((s) => s.selectHypothesis);
+  const toggleAsk = useAppStore((s) => s.toggleAsk);
+  const elapsed = useElapsedSeconds(narrativeLoading);
 
   if (!model || !bayes) {
     return (
@@ -174,6 +178,13 @@ export default function BriefingTab() {
           >
             <Play size={10} /> 60-second guided tour
           </button>
+          <button
+            type="button"
+            onClick={() => toggleAsk(true)}
+            className="flex items-center gap-1 transition-colors hover:text-sky-300"
+          >
+            <MessageCircleQuestion size={10} /> ask TRIAGE about this
+          </button>
           {!narrative && (
             <button
               type="button"
@@ -181,7 +192,10 @@ export default function BriefingTab() {
               onClick={() => void generateNarrative()}
               className="flex items-center gap-1 transition-colors hover:text-sky-300 disabled:opacity-40"
             >
-              <Bot size={10} /> {narrativeLoading ? 'generating narrative…' : 'generate AI narrative'}
+              <Bot size={10} />{' '}
+              {narrativeLoading
+                ? `generating narrative… ${elapsed > 0 ? `${elapsed}s` : ''}`
+                : 'generate AI narrative'}
             </button>
           )}
         </div>

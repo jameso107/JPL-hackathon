@@ -3,7 +3,7 @@
  * Used by both the Express dev proxy (server/index.ts) and the Vercel
  * serverless function (api/disposition.ts). Dependency-free plain TS.
  */
-import { buildMessages, MAX_TOKENS, TEMPERATURE, type RetryInfo } from './prompt';
+import { buildRequest, type ProxyRequestBody } from './prompt';
 
 // A 31B reasoning model emits a <think> block before the JSON, so first-token
 // and total latency run well past 30s. Give it real headroom.
@@ -71,14 +71,11 @@ export interface DispositionResponse {
   body: Record<string, unknown>;
 }
 
-interface DispositionRequestBody {
-  payload?: unknown;
-  retry?: RetryInfo;
-}
-
 /**
- * Full route logic: env check → payload check → upstream chat/completions
- * (OpenAI format, 30s AbortController timeout) → { content } | error status.
+ * Full route logic: env check → body check → per-task message assembly →
+ * upstream chat/completions (OpenAI format, AbortController timeout) →
+ * { content } | error status. Handles both the disposition narrative and the
+ * "ask the analysis" Q&A task (selected by body.task; absent ⇒ disposition).
  */
 export async function handleDispositionRequest(
   rawBody: unknown,
@@ -100,23 +97,26 @@ export async function handleDispositionRequest(
     };
   }
 
-  let body: DispositionRequestBody;
+  let body: ProxyRequestBody;
   if (typeof rawBody === 'string') {
     try {
-      body = JSON.parse(rawBody) as DispositionRequestBody;
+      body = JSON.parse(rawBody) as ProxyRequestBody;
     } catch {
       return { status: 400, body: { error: 'request body is not valid JSON' } };
     }
   } else if (rawBody !== null && typeof rawBody === 'object') {
-    body = rawBody as DispositionRequestBody;
+    body = rawBody as ProxyRequestBody;
   } else {
     return { status: 400, body: { error: 'missing request body' } };
   }
   if (body.payload === undefined) {
     return { status: 400, body: { error: 'missing `payload`' } };
   }
+  if (body.task === 'ask' && (typeof body.question !== 'string' || body.question.trim() === '')) {
+    return { status: 400, body: { error: 'missing `question` for task "ask"' } };
+  }
 
-  const messages = buildMessages(body.payload, body.retry);
+  const { messages, temperature, maxTokens } = buildRequest(body);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -133,8 +133,8 @@ export async function handleDispositionRequest(
         body: JSON.stringify({
           model: cfg.model,
           messages,
-          temperature: TEMPERATURE,
-          max_tokens: MAX_TOKENS,
+          temperature,
+          max_tokens: maxTokens,
         }),
         signal: controller.signal,
       });

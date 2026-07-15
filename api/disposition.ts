@@ -8,12 +8,18 @@
  * Vercel Node builder. Keep this file dependency-free; the Express dev proxy
  * (server/) remains the imported, unit-tested implementation — apply logic
  * changes in BOTH places.
+ *
+ * Two tasks ride this one route, selected by body.task:
+ *   'disposition' (default) — the audience-tuned review-board narrative
+ *   'ask'                    — grounded Q&A over the already-computed analysis
  */
 
 const UPSTREAM_TIMEOUT_MS = 120_000;
 const ERROR_TRUNCATE_CHARS = 500;
 const TEMPERATURE = 0.2;
 const MAX_TOKENS = 4000;
+const QA_TEMPERATURE = 0.3;
+const QA_MAX_TOKENS = 1200;
 
 const NARRATIVE_SCHEMA_INLINE = `{
   "executiveSummary": "string — <= 120 words; use the provided numbers verbatim",
@@ -48,6 +54,28 @@ ${NARRATIVE_SCHEMA_INLINE}
 5. "aiProposedHypotheses" is optional; omit it if you have nothing rigorous to add. Every other field is required.
 Keep the executive summary crisp (<= 120 words) and each rationale to 1-3 sentences.`;
 
+const QA_SCHEMA_INLINE = `{
+  "answer": "string — your answer, grounded ONLY in the provided analysis. Cite findings inline as [EV-05] using ids from the payload.",
+  "citedEvidence": ["string — every evidence id (EV-..) you referenced; MUST appear in the payload"],
+  "outsideAnalysis": "boolean — true if the question cannot be answered from the provided analysis"
+}`;
+
+const QA_SYSTEM_PROMPT = `You are TRIAGE's flight-anomaly analysis assistant for a planetary rotorcraft (Mars Sample Return Helicopter). A deterministic pipeline has ALREADY computed the evidence, posteriors, decision costs, sensitivity notes, and triage plan supplied to you as JSON. An engineer is asking questions about that analysis. Answer as a careful, plain-spoken flight-review analyst.
+
+HARD RULES — violations make your output unusable:
+1. NO ARITHMETIC. Never compute, re-derive, estimate, or invent a number. Quote the numbers in the payload verbatim; if a number is not in the payload, say it is not in the analysis.
+2. GROUND EVERY CLAIM in the provided analysis (evidence, hypotheses, decision actions, schedule, sensitivity notes, triage steps, hypothesis library). Do not use outside knowledge to assert facts about this vehicle or flight.
+3. CITE FINDINGS INLINE as [EV-05], using only evidence ids that appear in the payload, and list those same ids in citedEvidence. Never invent an id.
+4. WHAT-IF questions ("what if the wind were higher?", "what would flip the recommendation?") are answered QUALITATIVELY and by pointing at the provided sensitivityNotes. NEVER produce a new posterior, probability, or cost — the pipeline owns those numbers.
+5. If the question cannot be answered from the analysis, set outsideAnalysis=true, say plainly what the analysis does and does not cover, and point the engineer to the deterministic views instead of speculating.
+6. STRICT JSON ONLY. Respond with exactly one JSON object matching this schema — no markdown fences, no <think> blocks, no prose before or after the JSON:
+${QA_SCHEMA_INLINE}
+Keep the answer concise and readable (<= 180 words). Prefer short paragraphs over lists.`;
+
+type LlmTask = 'disposition' | 'ask';
+type NarrativeAudience = 'board' | 'engineer';
+type NarrativeFocus = 'executiveSummary';
+
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -56,6 +84,21 @@ interface ChatMessage {
 interface RetryInfo {
   previousResponse?: unknown;
   zodError?: unknown;
+}
+
+interface QaHistoryTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+interface ProxyRequestBody {
+  task?: LlmTask;
+  payload?: unknown;
+  audience?: NarrativeAudience;
+  focus?: NarrativeFocus;
+  retry?: RetryInfo;
+  question?: string;
+  history?: QaHistoryTurn[];
 }
 
 const asText = (value: unknown): string =>
@@ -87,9 +130,44 @@ function describeFetchError(err: unknown): string {
   return err.message;
 }
 
-function buildMessages(payload: unknown, retry?: RetryInfo): ChatMessage[] {
+function audienceClause(audience?: NarrativeAudience): string {
+  if (audience === 'board') {
+    return (
+      '\n\nAUDIENCE — REVIEW BOARD: Write for a program review board and non-specialist decision-makers. ' +
+      'Lead with the decision. Use plain language, spell out jargon, and keep the executive summary to <= 100 words. ' +
+      'Avoid method names (no "posterior", "log-odds", "tempering"); say "confidence", "evidence", "how sure we are".'
+    );
+  }
+  if (audience === 'engineer') {
+    return (
+      '\n\nAUDIENCE — ENGINEER: Write for a subsystem engineer. Be precise and method-aware: ' +
+      'you may reference posteriors, priors, likelihood ratios, and the specific evidence patterns by name. ' +
+      'Prioritise technical specificity and the discriminating evidence over accessibility.'
+    );
+  }
+  return '';
+}
+
+function focusClause(focus?: NarrativeFocus): string {
+  if (focus === 'executiveSummary') {
+    return (
+      '\n\nFOCUS: Regenerate ONLY the executiveSummary field. Return hypothesisRationales, ' +
+      'triageStepRationales, and caveats as empty arrays ([]), and omit aiProposedHypotheses. ' +
+      'Do not spend effort on any field other than executiveSummary.'
+    );
+  }
+  return '';
+}
+
+function buildMessages(
+  payload: unknown,
+  retry?: RetryInfo,
+  audience?: NarrativeAudience,
+  focus?: NarrativeFocus,
+): ChatMessage[] {
+  const system = SYSTEM_PROMPT + audienceClause(audience) + focusClause(focus);
   const messages: ChatMessage[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: system },
     { role: 'user', content: JSON.stringify(payload) },
   ];
   if (retry !== undefined) {
@@ -103,6 +181,59 @@ function buildMessages(payload: unknown, retry?: RetryInfo): ChatMessage[] {
     });
   }
   return messages;
+}
+
+function buildQaMessages(
+  payload: unknown,
+  question: string,
+  history: QaHistoryTurn[] = [],
+  retry?: RetryInfo,
+): ChatMessage[] {
+  const messages: ChatMessage[] = [
+    { role: 'system', content: QA_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `ANALYSIS PACKAGE (the only source of truth for your answer):\n${JSON.stringify(payload)}`,
+    },
+  ];
+  for (const turn of history) {
+    if (turn.role === 'user' || turn.role === 'assistant') {
+      messages.push({ role: turn.role, content: turn.text });
+    }
+  }
+  messages.push({ role: 'user', content: `QUESTION: ${question}` });
+  if (retry !== undefined) {
+    messages.push({ role: 'assistant', content: asText(retry.previousResponse) });
+    messages.push({
+      role: 'user',
+      content:
+        `Your previous response failed schema validation: ${asText(retry.zodError).slice(0, 800)}. ` +
+        `Respond again with ONLY a single valid JSON object matching the Q&A schema exactly — ` +
+        `no markdown fences, no commentary, no think tags, nothing outside the JSON object.`,
+    });
+  }
+  return messages;
+}
+
+interface AssembledRequest {
+  messages: ChatMessage[];
+  temperature: number;
+  maxTokens: number;
+}
+
+function buildRequest(body: ProxyRequestBody): AssembledRequest {
+  if (body.task === 'ask') {
+    return {
+      messages: buildQaMessages(body.payload, body.question ?? '', body.history ?? [], body.retry),
+      temperature: QA_TEMPERATURE,
+      maxTokens: QA_MAX_TOKENS,
+    };
+  }
+  return {
+    messages: buildMessages(body.payload, body.retry, body.audience, body.focus),
+    temperature: TEMPERATURE,
+    maxTokens: MAX_TOKENS,
+  };
 }
 
 function chatCompletionsUrl(baseUrl: string): string {
@@ -134,21 +265,26 @@ async function handleDisposition(rawBody: unknown): Promise<DispositionResponse>
     };
   }
 
-  let body: { payload?: unknown; retry?: RetryInfo };
+  let body: ProxyRequestBody;
   if (typeof rawBody === 'string') {
     try {
-      body = JSON.parse(rawBody) as { payload?: unknown; retry?: RetryInfo };
+      body = JSON.parse(rawBody) as ProxyRequestBody;
     } catch {
       return { status: 400, body: { error: 'request body is not valid JSON' } };
     }
   } else if (rawBody !== null && typeof rawBody === 'object') {
-    body = rawBody as { payload?: unknown; retry?: RetryInfo };
+    body = rawBody as ProxyRequestBody;
   } else {
     return { status: 400, body: { error: 'missing request body' } };
   }
   if (body.payload === undefined) {
     return { status: 400, body: { error: 'missing `payload`' } };
   }
+  if (body.task === 'ask' && (typeof body.question !== 'string' || body.question.trim() === '')) {
+    return { status: 400, body: { error: 'missing `question` for task "ask"' } };
+  }
+
+  const { messages, temperature, maxTokens } = buildRequest(body);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -164,9 +300,9 @@ async function handleDisposition(rawBody: unknown): Promise<DispositionResponse>
         },
         body: JSON.stringify({
           model: model.trim(),
-          messages: buildMessages(body.payload, body.retry),
-          temperature: TEMPERATURE,
-          max_tokens: MAX_TOKENS,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
         }),
         signal: controller.signal,
       });

@@ -24,6 +24,7 @@ import { msrhDemoFiles } from '../demo/msrhDemo';
 import { ingestFiles } from '../ingest';
 import { runBayes } from '../reasoning/bayes';
 import { buildFallbackNarrative, requestNarrative } from '../reasoning/llm';
+import { askQuestion as runAsk } from '../reasoning/llm/qa';
 import { runTriage } from '../triage';
 import type {
   BayesResult,
@@ -33,8 +34,11 @@ import type {
   IngestNotice,
   MappingProfile,
   MissionModel,
+  NarrativeAudience,
+  NarrativeFocus,
   NarrativeRequest,
   NarrativeResult,
+  QaTurn,
   RawFile,
   TriagePlan,
 } from '../types';
@@ -67,6 +71,12 @@ export interface AppState {
   // async narrative
   narrative: NarrativeResult | null;
   narrativeLoading: boolean;
+  /** review-board (plain) vs engineer (technical) tone for the narrative */
+  narrativeAudience: NarrativeAudience;
+  // "Ask TRIAGE" grounded chat (async)
+  qaMessages: QaTurn[];
+  qaLoading: boolean;
+  askOpen: boolean;
   // ui state
   activeTab: TabId;
   selectedEvidenceId: string | null;
@@ -81,7 +91,14 @@ export interface AppState {
   ingestBrowserFiles: (files: File[]) => Promise<void>;
   /** confirm a mapping-dialog profile and re-ingest the current file set with it */
   applyManualMapping: (profile: MappingProfile) => void;
-  generateNarrative: () => Promise<void>;
+  /** generate (or, with focus, regenerate a single section of) the narrative */
+  generateNarrative: (opts?: { focus?: NarrativeFocus }) => Promise<void>;
+  /** switch narrative audience and regenerate if a narrative already exists */
+  setNarrativeAudience: (audience: NarrativeAudience) => void;
+  /** open/close the Ask-TRIAGE drawer (toggles when no arg is given) */
+  toggleAsk: (open?: boolean) => void;
+  /** ask a grounded question; appends the user turn + the async answer turn */
+  askQuestion: (text: string) => Promise<void>;
   setActiveTab: (tab: TabId) => void;
   selectEvidence: (id: string | null) => void;
   selectHypothesis: (id: string | null) => void;
@@ -105,6 +122,8 @@ type DerivedSlice = Pick<
   | 'triage'
   | 'narrative'
   | 'narrativeLoading'
+  | 'qaMessages'
+  | 'qaLoading'
   | 'selectedEvidenceId'
   | 'selectedHypothesisId'
 >;
@@ -120,6 +139,8 @@ const EMPTY_SLICE: DerivedSlice = {
   triage: null,
   narrative: null,
   narrativeLoading: false,
+  qaMessages: [],
+  qaLoading: false,
   selectedEvidenceId: null,
   selectedHypothesisId: null,
 };
@@ -226,6 +247,8 @@ function deriveFromFiles(files: RawFile[], extraProfiles: MappingProfile[] = [])
     triage,
     narrative: null,
     narrativeLoading: false,
+    qaMessages: [],
+    qaLoading: false,
     selectedEvidenceId: null,
     selectedHypothesisId: bayes?.posteriors[0]?.hypothesisId ?? null,
   };
@@ -234,6 +257,8 @@ function deriveFromFiles(files: RawFile[], extraProfiles: MappingProfile[] = [])
 export const useAppStore = create<AppState>()((set, get) => ({
   ...EMPTY_SLICE,
   activeTab: 'home',
+  narrativeAudience: 'board',
+  askOpen: false,
   evidenceFocusNonce: 0,
   lastFiles: [],
   customProfiles: [],
@@ -297,8 +322,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     });
   },
 
-  generateNarrative: async () => {
-    const { evidence, bayes, decision, triage, model, narrativeLoading } = get();
+  generateNarrative: async (opts) => {
+    const { evidence, bayes, decision, triage, model, narrativeLoading, narrativeAudience } = get();
     if (narrativeLoading) return;
     if (!evidence || !bayes || !decision || !triage) return;
     const req: NarrativeRequest = {
@@ -307,11 +332,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
       decision,
       triage,
       vehicle: model?.meta.vehicle ?? 'MSRH',
+      audience: narrativeAudience,
     };
     set({ narrativeLoading: true });
     let result: NarrativeResult;
     try {
-      result = await requestNarrative(req);
+      result = await requestNarrative(req, opts);
     } catch (err) {
       // requestNarrative is contractually non-throwing; belt and braces.
       result = {
@@ -320,7 +346,61 @@ export const useAppStore = create<AppState>()((set, get) => ({
         error: messageOf(err),
       };
     }
-    set({ narrative: result, narrativeLoading: false });
+    // A focused regenerate swaps in only that section, preserving the rest of
+    // the current narrative (the model returns empty arrays for other fields).
+    const prev = get().narrative;
+    if (opts?.focus === 'executiveSummary' && prev) {
+      set({
+        narrative: {
+          ...result,
+          narrative: { ...prev.narrative, executiveSummary: result.narrative.executiveSummary },
+        },
+        narrativeLoading: false,
+      });
+    } else {
+      set({ narrative: result, narrativeLoading: false });
+    }
+  },
+
+  setNarrativeAudience: (audience) => {
+    if (get().narrativeAudience === audience) return;
+    set({ narrativeAudience: audience });
+    // Re-narrate under the new audience only if a narrative is already shown.
+    if (get().narrative) void get().generateNarrative();
+  },
+
+  toggleAsk: (open) => set((s) => ({ askOpen: open ?? !s.askOpen })),
+
+  askQuestion: async (text) => {
+    const question = text.trim();
+    if (question === '') return;
+    const { evidence, bayes, decision, triage, model, qaLoading, qaMessages } = get();
+    if (qaLoading) return;
+    if (!evidence || !bayes || !decision || !triage) return;
+    const req: NarrativeRequest = {
+      evidence,
+      bayes,
+      decision,
+      triage,
+      vehicle: model?.meta.vehicle ?? 'MSRH',
+    };
+    const history = qaMessages;
+    // Append the user turn immediately; mark loading.
+    set({ qaMessages: [...qaMessages, { role: 'user', text: question }], qaLoading: true });
+    let answer: QaTurn;
+    try {
+      answer = await runAsk(req, question, history);
+    } catch (err) {
+      // runAsk is contractually non-throwing; belt and braces.
+      answer = {
+        role: 'assistant',
+        text: 'The AI assistant is unavailable right now. Open the Analysis and Decision views for the computed result.',
+        fallback: true,
+        status: 'fallback',
+        error: messageOf(err),
+      };
+    }
+    set((s) => ({ qaMessages: [...s.qaMessages, answer], qaLoading: false }));
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -338,6 +418,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set({
       ...EMPTY_SLICE,
       activeTab: 'home',
+      narrativeAudience: 'board',
+      askOpen: false,
       lastFiles: [],
       customProfiles: [],
       storyActive: false,

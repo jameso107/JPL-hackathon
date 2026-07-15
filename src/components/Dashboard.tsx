@@ -9,12 +9,14 @@ import {
   ArrowLeft,
   Database,
   FileOutput,
+  MessageCircleQuestion,
   Plane,
   Scale,
   Stethoscope,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAppStore, type TabId } from '../state/store';
+import AskDrawer from './ask/AskDrawer';
 import BriefingTab from './briefing/BriefingTab';
 import StoryOverlay from './story/StoryOverlay';
 import DecisionTab from './DecisionTab';
@@ -38,6 +40,8 @@ const DETAIL_TABS: { id: TabId; label: string; icon: ReactNode }[] = [
 export default function Dashboard() {
   const activeTab = useAppStore((s) => s.activeTab);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const toggleAsk = useAppStore((s) => s.toggleAsk);
+  const canAsk = useAppStore((s) => Boolean(s.bayes));
   const onCommand = activeTab === 'briefing';
 
   return (
@@ -69,6 +73,16 @@ export default function Dashboard() {
               >
                 <ArrowLeft size={12} /> command
               </button>
+              {canAsk && (
+                <button
+                  type="button"
+                  onClick={() => toggleAsk(true)}
+                  className="flex items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-sky-300 transition-colors hover:bg-sky-500/20"
+                  title="ask a grounded question about this analysis"
+                >
+                  <MessageCircleQuestion size={12} /> ask
+                </button>
+              )}
               <div className="ml-auto">
                 <StatusRibbon />
               </div>
@@ -113,6 +127,7 @@ export default function Dashboard() {
       </main>
 
       <StoryOverlay />
+      <AskDrawer />
 
       <footer className="mx-auto max-w-[1600px] px-4 pb-4">
         <p className="border-t border-slate-800/60 pt-2 text-[10px] leading-snug text-slate-600">

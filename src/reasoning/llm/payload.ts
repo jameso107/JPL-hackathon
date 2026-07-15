@@ -20,6 +20,8 @@ export interface CompactHypothesis {
   posterior: number;
   /** top-3 waterfall contributors rendered as text, e.g. "EV-08 bearing_play_near_limit: +1.234 log-odds" */
   topContributors: string[];
+  /** evidence ids that matched this hypothesis — lets Q&A answer "why not X?" */
+  matchedEvidence: string[];
 }
 
 export interface CompactAction {
@@ -48,6 +50,8 @@ export interface CompactPayload {
   };
   triageSteps: { id: string; name: string; rationale: string }[];
   hypothesisLibrary: { id: string; name: string; description: string }[];
+  /** deterministic sensitivity notes — the ONLY basis for "what-if" answers */
+  sensitivityNotes: string[];
 }
 
 const round = (x: number, digits: number): number => Number(x.toFixed(digits));
@@ -86,6 +90,7 @@ export function buildCompactPayload(req: NarrativeRequest): CompactPayload {
         .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
         .slice(0, 3)
         .map(contributorText),
+      matchedEvidence: p.matchedEvidence.slice(),
     })),
     decision: {
       recommendedActionId: req.decision.recommendedActionId,
@@ -114,5 +119,6 @@ export function buildCompactPayload(req: NarrativeRequest): CompactPayload {
       name: h.name,
       description: h.description,
     })),
+    sensitivityNotes: req.decision.sensitivityNotes.slice(),
   };
 }

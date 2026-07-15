@@ -7,7 +7,12 @@
  * error; then deterministic fallback narrative. The model never sees raw
  * files and never does arithmetic.
  */
-import type { DispositionNarrative, NarrativeRequest, NarrativeResult } from '../../types';
+import type {
+  DispositionNarrative,
+  NarrativeFocus,
+  NarrativeRequest,
+  NarrativeResult,
+} from '../../types';
 import { buildFallbackNarrative } from './fallback';
 import { buildCompactPayload } from './payload';
 import {
@@ -26,8 +31,11 @@ export const CLIENT_TIMEOUT_MS = 150_000;
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
-/** POST to the dev/serverless proxy; returns the raw model text. Throws on any transport problem. */
-async function postDisposition(body: unknown): Promise<string> {
+/**
+ * POST to the dev/serverless proxy; returns the raw model text. Throws on any
+ * transport problem. Shared by every AI feature (disposition narrative + Q&A) —
+ * the `body.task` discriminator selects the prompt server-side. */
+export async function postLlm(body: unknown): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
   try {
@@ -93,13 +101,23 @@ function fallbackResult(req: NarrativeRequest, error: string): NarrativeResult {
   return { status: 'fallback', narrative: buildFallbackNarrative(req), error };
 }
 
-export async function requestNarrative(req: NarrativeRequest): Promise<NarrativeResult> {
+/** Options for a narrative request: audience tuning + optional single-section focus. */
+export interface NarrativeOptions {
+  focus?: NarrativeFocus;
+}
+
+export async function requestNarrative(
+  req: NarrativeRequest,
+  opts: NarrativeOptions = {},
+): Promise<NarrativeResult> {
   const payload = buildCompactPayload(req);
+  const audience = req.audience;
+  const focus = opts.focus;
 
   // Attempt 1. Transport failures (network, non-200, timeout) skip straight to fallback.
   let firstContent: string;
   try {
-    firstContent = await postDisposition({ payload });
+    firstContent = await postLlm({ task: 'disposition', payload, audience, focus });
   } catch (err) {
     return fallbackResult(req, messageOf(err));
   }
@@ -112,8 +130,11 @@ export async function requestNarrative(req: NarrativeRequest): Promise<Narrative
   // Attempt 2: one corrective retry echoing the previous response + validation error.
   let secondContent: string;
   try {
-    secondContent = await postDisposition({
+    secondContent = await postLlm({
+      task: 'disposition',
       payload,
+      audience,
+      focus,
       retry: { previousResponse: firstContent, zodError: first.error },
     });
   } catch (err) {

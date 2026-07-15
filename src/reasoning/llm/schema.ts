@@ -39,6 +39,32 @@ export const dispositionNarrativeSchema = z.object({
 
 export type ParsedNarrative = z.infer<typeof dispositionNarrativeSchema>;
 
+/** Mirrors QaAnswer (src/types/narrative.ts) — the "Ask TRIAGE" answer shape. */
+export const qaAnswerSchema = z.object({
+  answer: z.string().min(1),
+  citedEvidence: z.array(z.string()),
+  outsideAnalysis: z.boolean(),
+});
+
+export type ParsedQaAnswer = z.infer<typeof qaAnswerSchema>;
+
+/**
+ * Drop any cited evidence id that is not in the evidence package, de-dupe, and
+ * preserve order — the same id-hygiene rule sanitizeNarrative applies, so a
+ * model that invents an EV id never surfaces a dead citation chip.
+ */
+export function sanitizeCitedEvidence(ids: string[], validIds: Set<string>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (validIds.has(id) && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+}
+
 /**
  * Extract a JSON object from raw model text: strip <think>/<thinking> blocks
  * and markdown fences, then take the substring from the first `{` to the

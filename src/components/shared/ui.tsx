@@ -169,25 +169,28 @@ export function Disclosure({
   label,
   teaser,
   defaultOpen = false,
-  forceOpen = false,
+  open: openProp,
+  onToggle,
   children,
   className,
 }: {
   label: string;
   teaser?: ReactNode;
   defaultOpen?: boolean;
-  /** external open request (e.g. traceability jump into a collapsed group) */
-  forceOpen?: boolean;
+  /** controlled mode (e.g. a traceability jump auto-opening a collapsed group) */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
   children: ReactNode;
   className?: string;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const isOpen = open || forceOpen;
+  const [openState, setOpenState] = useState(defaultOpen);
+  const isOpen = openProp ?? openState;
+  const toggle = () => (onToggle ? onToggle(!isOpen) : setOpenState(!isOpen));
   return (
     <div className={className}>
       <button
         type="button"
-        onClick={() => setOpen(!isOpen)}
+        onClick={toggle}
         aria-expanded={isOpen}
         className="flex w-full items-center gap-1.5 py-1 text-left font-mono text-[10px] uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-300"
       >

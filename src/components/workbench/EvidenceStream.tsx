@@ -10,7 +10,7 @@ import { useAppStore } from '../../state/store';
 import { fmtNum, fmtRowList } from '../shared/format';
 import { prettyTag } from '../shared/names';
 import { KIND_COLORS, KIND_ORDER } from '../shared/palette';
-import { KindBadge, Meter } from '../shared/ui';
+import { Disclosure, KindBadge, Meter } from '../shared/ui';
 
 function EvidenceCard({
   item,
@@ -68,6 +68,7 @@ export default function EvidenceStream() {
   const focusNonce = useAppStore((s) => s.evidenceFocusNonce);
   const selectEvidence = useAppStore((s) => s.selectEvidence);
   const [kindFilter, setKindFilter] = useState<EvidenceKind | null>(null);
+  const [supportingOpen, setSupportingOpen] = useState(false);
   const cardRefs = useRef(new Map<string, HTMLLIElement>());
 
   const items = evidence?.items ?? [];
@@ -75,14 +76,22 @@ export default function EvidenceStream() {
     () => KIND_ORDER.filter((k) => items.some((i) => i.kind === k)),
     [items],
   );
+  // Chunking: strong findings (weight ≥ 0.5) lead; the long tail of context,
+  // constraints and historical matches collapses. An active kind filter is an
+  // explicit zoom, so it shows a flat filtered list instead.
+  const keyItems = useMemo(() => items.filter((i) => i.weight >= 0.5), [items]);
+  const supportingItems = useMemo(() => items.filter((i) => i.weight < 0.5), [items]);
   const visible = kindFilter ? items.filter((i) => i.kind === kindFilter) : items;
 
-  // Selecting evidence that the current filter hides would silently no-op the
-  // scroll — clear the filter so the traceability jump always lands.
+  // Traceability contract: a jump to evidence hidden by the current filter or
+  // inside the collapsed supporting group must always land — clear the filter
+  // and auto-open the group (keyed on focusNonce so re-clicks re-trigger).
   useEffect(() => {
     if (!selectedId) return;
     const item = items.find((i) => i.id === selectedId);
-    if (item && kindFilter && item.kind !== kindFilter) setKindFilter(null);
+    if (!item) return;
+    if (kindFilter && item.kind !== kindFilter) setKindFilter(null);
+    if (item.weight < 0.5) setSupportingOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, focusNonce]);
 
@@ -90,7 +99,7 @@ export default function EvidenceStream() {
     if (!selectedId) return;
     const el = cardRefs.current.get(selectedId);
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [selectedId, focusNonce, kindFilter]);
+  }, [selectedId, focusNonce, kindFilter, supportingOpen]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -125,20 +134,66 @@ export default function EvidenceStream() {
         ))}
       </div>
       <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {visible.map((item) => (
-          <EvidenceCard
-            key={item.id}
-            item={item}
-            selected={item.id === selectedId}
-            onSelect={() => selectEvidence(item.id === selectedId ? null : item.id)}
-            cardRef={(el) => {
-              if (el) cardRefs.current.set(item.id, el);
-              else cardRefs.current.delete(item.id);
-            }}
-          />
-        ))}
-        {visible.length === 0 && (
-          <li className="py-6 text-center text-xs text-slate-500">no evidence in this filter</li>
+        {kindFilter ? (
+          <>
+            {visible.map((item) => (
+              <EvidenceCard
+                key={item.id}
+                item={item}
+                selected={item.id === selectedId}
+                onSelect={() => selectEvidence(item.id === selectedId ? null : item.id)}
+                cardRef={(el) => {
+                  if (el) cardRefs.current.set(item.id, el);
+                  else cardRefs.current.delete(item.id);
+                }}
+              />
+            ))}
+            {visible.length === 0 && (
+              <li className="py-6 text-center text-xs text-slate-500">
+                no evidence in this filter
+              </li>
+            )}
+          </>
+        ) : (
+          <>
+            {keyItems.map((item) => (
+              <EvidenceCard
+                key={item.id}
+                item={item}
+                selected={item.id === selectedId}
+                onSelect={() => selectEvidence(item.id === selectedId ? null : item.id)}
+                cardRef={(el) => {
+                  if (el) cardRefs.current.set(item.id, el);
+                  else cardRefs.current.delete(item.id);
+                }}
+              />
+            ))}
+            {supportingItems.length > 0 && (
+              <li>
+                <Disclosure
+                  label={`supporting & context evidence (${supportingItems.length})`}
+                  teaser="constraints, historical matches and weaker signals — auto-opens when a citation points here"
+                  open={supportingOpen}
+                  onToggle={setSupportingOpen}
+                >
+                  <ul className="space-y-2">
+                    {supportingItems.map((item) => (
+                      <EvidenceCard
+                        key={item.id}
+                        item={item}
+                        selected={item.id === selectedId}
+                        onSelect={() => selectEvidence(item.id === selectedId ? null : item.id)}
+                        cardRef={(el) => {
+                          if (el) cardRefs.current.set(item.id, el);
+                          else cardRefs.current.delete(item.id);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                </Disclosure>
+              </li>
+            )}
+          </>
         )}
       </ul>
     </div>

@@ -6,76 +6,21 @@ import { clsx } from 'clsx';
 import { useState } from 'react';
 import {
   CalendarRange,
+  ChevronDown,
+  ChevronRight,
   GitBranch,
   ListOrdered,
   UserCheck,
 } from 'lucide-react';
 import { useAppStore } from '../state/store';
-import type { TriagePlan, TriageStep } from '../types';
+import type { TriageStep } from '../types';
 import { fmtNum, fmtUsd } from './shared/format';
+import MarginStrip from './shared/MarginStrip';
 import { hypName, prettyPair, prettyTag } from './shared/names';
 import { P } from './shared/palette';
-import { Badge, EmptyState, Section } from './shared/ui';
+import { Badge, Disclosure, EmptyState, Section, Term } from './shared/ui';
 
 const STEP_COLORS = [P.blue, P.aqua, P.yellow, P.violet, P.magenta, P.red];
-
-// ---------------------------------------------------------------------------
-// Sol-scaled timeline + margin bar
-// ---------------------------------------------------------------------------
-
-function MarginTimeline({ plan }: { plan: TriagePlan }) {
-  const decision = useAppStore((s) => s.decision);
-  const startSol = plan.steps[0]?.startSol ?? 0;
-  const deadline = decision?.schedule.effectiveDeadlineSol.value;
-  const currentSol = decision?.schedule.currentSol ?? startSol - 1;
-  // Scale: current sol → deadline (fallback: plan span padded).
-  const spanEnd = deadline ?? plan.completionSol + 10;
-  const span = Math.max(1, spanEnd - currentSol);
-  const pos = (sol: number) => `${Math.max(0, Math.min(100, ((sol - currentSol) / span) * 100))}%`;
-  const width = (sols: number) => `${Math.max(0.5, (sols / span) * 100)}%`;
-
-  return (
-    <div>
-      <div className="relative h-16 rounded-lg border border-slate-800 bg-slate-900/60 px-0">
-        {/* margin body */}
-        <div className="absolute inset-y-0 left-0 right-0 rounded-lg bg-emerald-500/5" />
-        {/* plan consumption */}
-        <div
-          className="absolute inset-y-0 rounded-l-lg bg-sky-500/10"
-          style={{ left: pos(currentSol), width: width(plan.totalDurationSols + (plan.steps[0]?.startSol ?? 0) - currentSol) }}
-          title={`triage plan: ${plan.totalDurationSols} sols`}
-        />
-        {/* step blocks */}
-        {plan.steps.map((s, i) => (
-          <div
-            key={s.stepId}
-            className="absolute top-2 h-7 rounded border border-slate-950/60"
-            style={{ left: pos(s.startSol), width: width(s.durationSols), backgroundColor: STEP_COLORS[i % STEP_COLORS.length] }}
-            title={`${s.stepId} ${s.name} · Sol ${s.startSol}–${s.startSol + s.durationSols}`}
-          >
-            <span className="block truncate px-1 font-mono text-[9px] leading-7 text-slate-950">
-              {s.stepId}
-            </span>
-          </div>
-        ))}
-        {/* sol ticks */}
-        <div className="absolute bottom-1 left-1 font-mono text-[9px] text-slate-500">
-          Sol {currentSol} (today)
-        </div>
-        <div className="absolute bottom-1 right-1 font-mono text-[9px] text-amber-300">
-          {deadline ? `Sol ${deadline} — effective deadline (window open − curing)` : `Sol ${spanEnd}`}
-        </div>
-        <div className="absolute bottom-6 font-mono text-[9px] text-slate-400" style={{ left: pos(plan.completionSol) }}>
-          ▲ plan complete Sol {plan.completionSol}
-        </div>
-      </div>
-      <p className="mt-1 px-1 text-[10px] leading-snug text-slate-500">
-        sol-scaled: colored blocks are triage steps; the full bar spans today → effective
-        launch-window deadline{deadline ? ` (${deadline - currentSol}-sol margin)` : ''}
-      </p>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Step card
@@ -123,7 +68,7 @@ function CandidatePicker({ step }: { step: TriageStep }) {
   return (
     <div>
       <p className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-        <UserCheck size={11} /> candidates (ranked — the human picks)
+        <UserCheck size={11} /> ranked candidates — the human picks
       </p>
       <ul className="space-y-1">
         {step.candidates.map((c) => (
@@ -163,10 +108,35 @@ function CandidatePicker({ step }: { step: TriageStep }) {
   );
 }
 
-function StepCard({ step, index }: { step: TriageStep; index: number }) {
+function StepCard({
+  step,
+  index,
+  maxDisc,
+  defaultOpen,
+}: {
+  step: TriageStep;
+  index: number;
+  /** largest discrimination score in the plan — keeps the header bars comparable */
+  maxDisc: number;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <li className="rounded-lg border border-slate-800 bg-slate-900/60">
-      <header className="flex flex-wrap items-center gap-2 border-b border-slate-800/80 px-3 py-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={clsx(
+          'flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left',
+          open && 'border-b border-slate-800/80',
+        )}
+      >
+        {open ? (
+          <ChevronDown size={13} className="shrink-0 text-slate-500" />
+        ) : (
+          <ChevronRight size={13} className="shrink-0 text-slate-500" />
+        )}
         <span
           className="flex h-5 w-9 items-center justify-center rounded font-mono text-[10px] font-bold text-slate-950"
           style={{ backgroundColor: STEP_COLORS[index % STEP_COLORS.length] }}
@@ -174,30 +144,55 @@ function StepCard({ step, index }: { step: TriageStep; index: number }) {
           {step.stepId}
         </span>
         <h3 className="text-xs font-medium text-slate-100">{step.name}</h3>
-        <span className="ml-auto flex flex-wrap items-center gap-2 font-mono text-[10px] text-slate-500">
+        <span className="ml-auto flex flex-wrap items-center gap-3 font-mono text-[10px] text-slate-500">
           <span>
             Sol {step.startSol}–{step.startSol + step.durationSols} ({step.durationSols} sols)
           </span>
           {typeof step.estimatedCostUsd === 'number' && <span>{fmtUsd(step.estimatedCostUsd)}</span>}
-          <span title="posterior-weighted pairs separated">disc {fmtNum(step.discriminationScore)}</span>
+          <span
+            className="flex items-center gap-1.5"
+            title={`tie-breaker power (discrimination score ${fmtNum(step.discriminationScore)}): how well this test separates the leading suspects`}
+          >
+            <span className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-800">
+              <span
+                className="block h-full rounded-full"
+                style={{
+                  width: `${maxDisc > 0 ? (step.discriminationScore / maxDisc) * 100 : 0}%`,
+                  backgroundColor: P.aqua,
+                }}
+              />
+            </span>
+            tie-break
+          </span>
         </span>
-      </header>
-      <div className="space-y-3 p-3">
-        <p className="text-[11px] leading-snug text-slate-400">{step.description}</p>
-        <p className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5 text-[11px] leading-snug text-slate-300">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">why here: </span>
-          {step.rationale}
-        </p>
-        {step.separates.length > 0 && (
-          <p className="text-[10px] leading-snug text-slate-500">
-            separates: {step.separates.map(prettyPair).join(' · ')}
+      </button>
+      {open && (
+        <div className="space-y-3 p-3">
+          <p className="text-[11px] leading-snug text-slate-400">{step.description}</p>
+          <p className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5 text-[11px] leading-snug text-slate-300">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">why here: </span>
+            {step.rationale}
           </p>
-        )}
-        <div className="grid gap-3 lg:grid-cols-2">
-          <Gates step={step} />
-          <CandidatePicker step={step} />
+          {step.separates.length > 0 && (
+            <p className="text-[10px] leading-snug text-slate-500">
+              separates: {step.separates.map(prettyPair).join(' · ')}
+            </p>
+          )}
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Gates step={step} />
+            <Disclosure
+              label="assign personnel · ranked candidates"
+              teaser={
+                step.candidates.length > 0
+                  ? `top match: ${step.candidates[0].name} (${step.candidates[0].role})`
+                  : 'no personnel data loaded'
+              }
+            >
+              <CandidatePicker step={step} />
+            </Disclosure>
+          </div>
         </div>
-      </div>
+      )}
     </li>
   );
 }
@@ -218,10 +213,16 @@ export default function TriageTab() {
     );
   }
 
+  const maxDisc = Math.max(...triage.steps.map((s) => s.discriminationScore), 0);
+
   return (
     <div className="space-y-3">
-      <Section title="Plan timeline vs launch-window margin" icon={<CalendarRange size={13} />}>
-        <MarginTimeline plan={triage} />
+      <Section
+        title="Plan timeline vs launch-window margin"
+        icon={<CalendarRange size={13} />}
+        id="plan-timeline"
+      >
+        <MarginStrip variant="full" />
       </Section>
 
       <Section
@@ -229,12 +230,13 @@ export default function TriageTab() {
         icon={<ListOrdered size={13} />}
       >
         <p className="mb-2 text-[11px] leading-snug text-slate-500">
-          Steps are ordered by discrimination value — how much posterior-weighted hypothesis mass
-          each test separates. Each gate names the follow-on action for its outcome.
+          Steps run in order of <Term k="discrimination" /> — the tests that best separate the
+          leading suspects go first. Expand a step for its <Term k="gate" mode="plain" />s and
+          candidate assignments.
         </p>
         <ul className="space-y-3">
           {triage.steps.map((s, i) => (
-            <StepCard key={s.stepId} step={s} index={i} />
+            <StepCard key={s.stepId} step={s} index={i} maxDisc={maxDisc} defaultOpen={i === 0} />
           ))}
         </ul>
       </Section>

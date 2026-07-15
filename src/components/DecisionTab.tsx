@@ -26,11 +26,15 @@ import {
 import { riskDefaults } from '../config';
 import { useAppStore } from '../state/store';
 import type { ActionEvaluation, DecisionAnalysis } from '../types';
-import { AXIS_LINE, AXIS_TICK, LegendRow, TipFrame, TipRow } from './shared/charts';
+import CostDotPlot from './decision/CostDotPlot';
+import OutcomeBars from './decision/OutcomeBars';
+import RecommendationCard from './decision/RecommendationCard';
+import RiskSampleScatter from './decision/RiskSampleScatter';
+import { AXIS_LINE, AXIS_TICK, ChartCaption, LegendRow, TipFrame, TipRow } from './shared/charts';
 import { fmtNum, fmtPct, fmtUsd, fmtUsdFull, truncate } from './shared/format';
-import { hypName } from './shared/names';
+import MarginStrip from './shared/MarginStrip';
 import { P } from './shared/palette';
-import { Badge, EmptyState, Section, StatTile } from './shared/ui';
+import { Badge, Disclosure, EmptyState, Section, StatTile, Term } from './shared/ui';
 
 // ---------------------------------------------------------------------------
 // Cost-component chart — direct cost vs dollarized LOV & sample-shortfall risk
@@ -200,36 +204,7 @@ function ActionRow({
             )}
 
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
-              <div>
-                <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-                  outcome by world state (hypothesis × posterior)
-                </p>
-                <table className="w-full border-collapse text-[11px]">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-left font-mono text-[9px] uppercase tracking-wider text-slate-500">
-                      <th className="py-1 pr-2 font-normal">hypothesis</th>
-                      <th className="py-1 pr-2 text-right font-normal">post.</th>
-                      <th className="py-1 pr-2 text-right font-normal">P(LOV)</th>
-                      <th className="py-1 pr-2 text-right font-normal">E[samples]</th>
-                      <th className="py-1 text-right font-normal">risk-adj cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...action.perHypothesis]
-                      .sort((a, b) => b.posterior - a.posterior)
-                      .filter((h) => h.posterior >= 0.005)
-                      .map((h) => (
-                        <tr key={h.hypothesisId} className="border-b border-slate-800/50 last:border-0">
-                          <td className="py-1 pr-2 text-slate-300">{truncate(hypName(h.hypothesisId), 34)}</td>
-                          <td className="py-1 pr-2 text-right font-mono tabular-nums text-slate-400">{fmtPct(h.posterior, 0)}</td>
-                          <td className="py-1 pr-2 text-right font-mono tabular-nums text-slate-400">{fmtPct(h.lovProbability, 2)}</td>
-                          <td className="py-1 pr-2 text-right font-mono tabular-nums text-slate-400">{fmtNum(h.expectedSamples)}</td>
-                          <td className="py-1 text-right font-mono tabular-nums text-slate-400">{fmtUsd(h.riskAdjustedCostUsd)}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+              <OutcomeBars action={action} />
 
               <div className="space-y-2.5">
                 <div>
@@ -357,20 +332,52 @@ export default function DecisionTab() {
 
   return (
     <div className="space-y-3">
+      <RecommendationCard analysis={decision} />
+
       <ScheduleStrip analysis={decision} />
 
-      <Section title="Action comparison — expected cost over world states" icon={<Scale size={13} />}>
+      <div className="grid gap-3 xl:grid-cols-2">
+        <Section title="The trade-off — samples vs risk" icon={<Scale size={13} />}>
+          <RiskSampleScatter analysis={decision} />
+        </Section>
+        <Section title="What each plan really costs" icon={<Scale size={13} />}>
+          <CostDotPlot analysis={decision} />
+        </Section>
+      </div>
+
+      <Section title="Schedule pressure" icon={<CalendarClock size={13} />}>
+        <MarginStrip variant="compact" />
+      </Section>
+
+      <Section
+        title="Action comparison — the full table"
+        icon={<Scale size={13} />}
+        collapsible
+        defaultOpen
+        id="action-table"
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse">
             <thead>
               <tr className="border-b border-slate-700 text-left font-mono text-[9px] uppercase tracking-wider text-slate-500">
                 <th className="px-2 py-1.5 font-normal">action plan (click to expand)</th>
-                <th className="px-2 py-1.5 text-right font-normal">delay sols</th>
+                <th className="px-2 py-1.5 text-right font-normal">
+                  delay (<Term k="sol" mode="plain" />
+                  s)
+                </th>
                 <th className="px-2 py-1.5 text-right font-normal">direct cost</th>
-                <th className="px-2 py-1.5 text-right font-normal">P(LOV)</th>
-                <th className="px-2 py-1.5 text-right font-normal">E[samples]</th>
-                <th className="px-2 py-1.5 text-right font-normal">margin used</th>
-                <th className="px-2 py-1.5 text-right font-normal">risk-adj expected cost</th>
+                <th className="px-2 py-1.5 text-right font-normal">
+                  <Term k="lov" mode="plain" />
+                </th>
+                <th className="px-2 py-1.5 text-right font-normal">
+                  <Term k="expectedSamples" mode="plain" />
+                </th>
+                <th className="px-2 py-1.5 text-right font-normal">
+                  <Term k="margin" mode="plain" /> used
+                </th>
+                <th className="px-2 py-1.5 text-right font-normal">
+                  <Term k="riskAdjustedCost" mode="plain" />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -387,18 +394,29 @@ export default function DecisionTab() {
         </div>
       </Section>
 
-      <Section title="Expected-cost decomposition" icon={<Scale size={13} />}>
+      <Section
+        title="Expected-cost decomposition (linear)"
+        icon={<Scale size={13} />}
+        collapsible
+        defaultOpen={false}
+        teaser="how each plan's cost splits into direct dollars, vehicle-loss risk and sample-shortfall risk — expand for the stacked view"
+      >
         <CostChart analysis={decision} pendingSamples={pendingSamples} />
       </Section>
 
       <div className="grid gap-3 lg:grid-cols-2">
         <AssumptionsPanel analysis={decision} />
-        <Section title="Sensitivity" icon={<CalendarClock size={13} />}>
-          <ul className="list-inside list-disc space-y-1.5 text-[11px] leading-snug text-slate-400">
-            {decision.sensitivityNotes.map((n) => (
-              <li key={n.slice(0, 48)}>{n}</li>
-            ))}
-          </ul>
+        <Section title="Sensitivity — would the recommendation change?" icon={<CalendarClock size={13} />}>
+          <p className="text-[11px] leading-snug text-slate-300">{decision.sensitivityNotes[0]}</p>
+          {decision.sensitivityNotes.length > 1 && (
+            <Disclosure className="mt-1.5" label={`${decision.sensitivityNotes.length - 1} more sensitivity checks`}>
+              <ul className="list-inside list-disc space-y-1.5 text-[11px] leading-snug text-slate-400">
+                {decision.sensitivityNotes.slice(1).map((n) => (
+                  <li key={n.slice(0, 48)}>{n}</li>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
           <p className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-600">
             <BookOpenCheck size={11} />
             computed by re-evaluating the tree across parameter grids — see docs/CONTRACTS.md §Decision

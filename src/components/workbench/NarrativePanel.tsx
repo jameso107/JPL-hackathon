@@ -5,8 +5,9 @@
  */
 import { Bot, Loader2, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../state/store';
+import { truncate } from '../shared/format';
 import { hypName } from '../shared/names';
-import { Badge, EvChip } from '../shared/ui';
+import { Badge, Disclosure, EvChip } from '../shared/ui';
 
 function StatusBadge() {
   const narrative = useAppStore((s) => s.narrative);
@@ -79,31 +80,29 @@ export default function NarrativePanel() {
           {n.hypothesisRationales.length > 0 && (
             <div>
               <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-                hypothesis rationales
+                why the leading cause
               </p>
-              <ul className="space-y-2">
-                {n.hypothesisRationales.map((hr) => (
-                  <li key={hr.hypothesisId} className="rounded border border-slate-800 bg-slate-900/50 p-2">
-                    <p className="text-[11px] font-medium text-slate-300">{hypName(hr.hypothesisId)}</p>
-                    <p className="mt-1 text-[11px] leading-snug text-slate-400">{hr.narrative}</p>
-                    {hr.citedEvidence.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {hr.citedEvidence.map((id) => (
-                          <EvChip key={id} id={id} invalid={!validIds.has(id)} />
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <RationaleCard hr={n.hypothesisRationales[0]} validIds={validIds} />
+              {n.hypothesisRationales.length > 1 && (
+                <Disclosure
+                  className="mt-1.5"
+                  label={`rationales for ${n.hypothesisRationales.length - 1} more causes`}
+                >
+                  <ul className="space-y-2">
+                    {n.hypothesisRationales.slice(1).map((hr) => (
+                      <RationaleCard key={hr.hypothesisId} hr={hr} validIds={validIds} />
+                    ))}
+                  </ul>
+                </Disclosure>
+              )}
             </div>
           )}
 
           {n.aiProposedHypotheses && n.aiProposedHypotheses.length > 0 && (
-            <div>
-              <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-                AI-proposed hypotheses
-              </p>
+            <Disclosure
+              label={`AI-proposed hypotheses (${n.aiProposedHypotheses.length})`}
+              teaser="new causes the AI suggested — flagged, unscored, each with a falsifiable test"
+            >
               <ul className="space-y-2">
                 {n.aiProposedHypotheses.map((p) => (
                   <li key={p.name} className="rounded border border-violet-400/40 bg-violet-500/5 p-2">
@@ -121,23 +120,45 @@ export default function NarrativePanel() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </Disclosure>
           )}
 
           {n.caveats.length > 0 && (
-            <div>
-              <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-                caveats
-              </p>
+            <Disclosure
+              label={`caveats (${n.caveats.length})`}
+              teaser={truncate(n.caveats[0], 90)}
+            >
               <ul className="list-inside list-disc space-y-1 text-[11px] leading-snug text-slate-400">
                 {n.caveats.map((c) => (
                   <li key={c.slice(0, 40)}>{c}</li>
                 ))}
               </ul>
-            </div>
+            </Disclosure>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function RationaleCard({
+  hr,
+  validIds,
+}: {
+  hr: { hypothesisId: string; narrative: string; citedEvidence: string[] };
+  validIds: Set<string>;
+}) {
+  return (
+    <li className="list-none rounded border border-slate-800 bg-slate-900/50 p-2">
+      <p className="text-[11px] font-medium text-slate-300">{hypName(hr.hypothesisId)}</p>
+      <p className="mt-1 text-[11px] leading-snug text-slate-400">{hr.narrative}</p>
+      {hr.citedEvidence.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {hr.citedEvidence.map((id) => (
+            <EvChip key={id} id={id} invalid={!validIds.has(id)} />
+          ))}
+        </div>
+      )}
+    </li>
   );
 }

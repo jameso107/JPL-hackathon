@@ -38,7 +38,7 @@ import type {
   TriagePlan,
 } from '../types';
 
-export type TabId = 'home' | 'workbench' | 'decision' | 'triage';
+export type TabId = 'home' | 'workbench' | 'decision' | 'triage' | 'flightdeck';
 
 export interface AppState {
   // inputs

@@ -4,10 +4,11 @@
  * all derived artifacts recompute reactively when inputs change.
  */
 import { clsx } from 'clsx';
-import { Activity, Home, Scale, Stethoscope } from 'lucide-react';
+import { Activity, Home, Plane, Scale, Stethoscope } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAppStore, type TabId } from '../state/store';
 import DecisionTab from './DecisionTab';
+import FlightDeck from './FlightDeck';
 import MissionHome from './MissionHome';
 import TriageTab from './TriageTab';
 import Workbench from './Workbench';
@@ -18,6 +19,7 @@ const TABS: { id: TabId; label: string; icon: ReactNode }[] = [
   { id: 'workbench', label: 'Anomaly Workbench', icon: <Activity size={13} /> },
   { id: 'decision', label: 'Decision Analysis', icon: <Scale size={13} /> },
   { id: 'triage', label: 'Triage Plan', icon: <Stethoscope size={13} /> },
+  { id: 'flightdeck', label: 'Flight Deck', icon: <Plane size={13} /> },
 ];
 
 function HeaderStatus() {
@@ -97,6 +99,7 @@ export default function Dashboard() {
         {activeTab === 'workbench' && <Workbench />}
         {activeTab === 'decision' && <DecisionTab />}
         {activeTab === 'triage' && <TriageTab />}
+        {activeTab === 'flightdeck' && <FlightDeck />}
       </main>
 
       <footer className="mx-auto max-w-[1600px] px-4 pb-4">

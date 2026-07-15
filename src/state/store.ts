@@ -77,6 +77,10 @@ export interface AppState {
   qaMessages: QaTurn[];
   qaLoading: boolean;
   askOpen: boolean;
+  // cause comparison (Analysis page)
+  compareMode: boolean;
+  /** hypothesis ids selected for side-by-side comparison (2–3) */
+  compareIds: string[];
   // ui state
   activeTab: TabId;
   selectedEvidenceId: string | null;
@@ -104,6 +108,10 @@ export interface AppState {
   setActiveTab: (tab: TabId) => void;
   selectEvidence: (id: string | null) => void;
   selectHypothesis: (id: string | null) => void;
+  /** enter/leave cause-comparison mode (toggles when no arg is given) */
+  toggleCompareMode: (on?: boolean) => void;
+  /** add/remove a cause from the comparison set (capped at 3) */
+  toggleCompareId: (id: string) => void;
   startStory: () => void;
   exitStory: () => void;
   setStoryStep: (step: number) => void;
@@ -126,6 +134,8 @@ type DerivedSlice = Pick<
   | 'narrativeLoading'
   | 'qaMessages'
   | 'qaLoading'
+  | 'compareMode'
+  | 'compareIds'
   | 'selectedEvidenceId'
   | 'selectedHypothesisId'
 >;
@@ -143,6 +153,8 @@ const EMPTY_SLICE: DerivedSlice = {
   narrativeLoading: false,
   qaMessages: [],
   qaLoading: false,
+  compareMode: false,
+  compareIds: [],
   selectedEvidenceId: null,
   selectedHypothesisId: null,
 };
@@ -251,6 +263,8 @@ function deriveFromFiles(files: RawFile[], extraProfiles: MappingProfile[] = [])
     narrativeLoading: false,
     qaMessages: [],
     qaLoading: false,
+    compareMode: false,
+    compareIds: [],
     selectedEvidenceId: null,
     selectedHypothesisId: bayes?.posteriors[0]?.hypothesisId ?? null,
   };
@@ -436,6 +450,31 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((s) => ({ selectedEvidenceId: id, evidenceFocusNonce: s.evidenceFocusNonce + 1 })),
 
   selectHypothesis: (id) => set({ selectedHypothesisId: id }),
+
+  toggleCompareMode: (on) => {
+    const next = on ?? !get().compareMode;
+    if (!next) {
+      set({ compareMode: false });
+      return;
+    }
+    // Entering compare with nothing chosen: preselect leader + runner-up so the
+    // "keep the runner-up in view" comparison is one click, not zero.
+    const { compareIds, bayes } = get();
+    const seed =
+      compareIds.length >= 2
+        ? compareIds
+        : bayes?.posteriors.slice(0, 2).map((p) => p.hypothesisId) ?? [];
+    set({ compareMode: true, compareIds: seed });
+  },
+
+  toggleCompareId: (id) =>
+    set((s) => {
+      if (s.compareIds.includes(id)) {
+        return { compareIds: s.compareIds.filter((x) => x !== id) };
+      }
+      if (s.compareIds.length >= 3) return {}; // cap at 3 for legibility
+      return { compareIds: [...s.compareIds, id] };
+    }),
 
   startStory: () => set({ storyActive: true, storyStep: 0 }),
   exitStory: () => set({ storyActive: false }),

@@ -24,6 +24,7 @@ import VibSparkline from '../overview/VibSparkline';
 import { fmtPct, fmtUsd } from '../shared/format';
 import { Badge, EmptyState, StatTile } from '../shared/ui';
 import { useElapsedSeconds } from '../shared/useElapsedSeconds';
+import CoveragePanel from '../workbench/CoveragePanel';
 import { confidencePhrase } from './confidence';
 
 function DrillLink({
@@ -155,6 +156,9 @@ export default function BriefingTab() {
           title={decision?.schedule.marginSols.citation}
         />
       </div>
+
+      {/* coverage & confidence basis — "what fed these numbers" (theme: trust) */}
+      <CoveragePanel variant="compact" />
 
       {/* 4 — recommendation sentence + quiet drill row */}
       {rec && (

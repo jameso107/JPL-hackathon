@@ -7,7 +7,7 @@ import { Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { fmtPct } from '../shared/format';
-import { Badge, Disclosure, Term } from '../shared/ui';
+import { Badge, Disclosure } from '../shared/ui';
 import HypothesisCard from './HypothesisCard';
 
 const VISIBLE_N = 3;
@@ -61,49 +61,28 @@ export default function HypothesisRail() {
   const tailMax = tail[0] ? fmtPct(tail[0].posterior, 1) : '0%';
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {head.map((hp) => (
-          <HypothesisCard key={hp.hypothesisId} posterior={hp} />
-        ))}
+    <ul className="space-y-2">
+      {head.map((hp) => (
+        <HypothesisCard key={hp.hypothesisId} posterior={hp} />
+      ))}
 
-        {tail.length > 0 && (
-          <li>
-            <Disclosure
-              label={`${tail.length} more unlikely causes`}
-              teaser={`each at ${tailMax} confidence or less — none ruled out, all one click away`}
-              {...(tailSelected ? { open: true, onToggle: () => undefined } : {})}
-            >
-              <ul className="space-y-2">
-                {tail.map((hp) => (
-                  <HypothesisCard key={hp.hypothesisId} posterior={hp} />
-                ))}
-              </ul>
-            </Disclosure>
-          </li>
-        )}
-
-        <AiProposedCards />
-
+      {tail.length > 0 && (
         <li>
           <Disclosure
-            label="methods · how these numbers are computed"
-            teaser="Bayesian update over fleet-history starting beliefs"
+            label={`${tail.length} more unlikely causes`}
+            teaser={`each at ${tailMax} confidence or less — none ruled out, all one click away`}
+            {...(tailSelected ? { open: true, onToggle: () => undefined } : {})}
           >
-            <p className="text-[10px] leading-snug text-slate-500">
-              <Term k="prior" mode="pair" />
-              {': '}
-              {bayes.priorsMeta.uniformFallback
-                ? 'uniform fallback (no anomaly history loaded)'
-                : `from heritage records ${bayes.priorsMeta.usedRecords.join(', ')}`}
-              {' · '}
-              <Term k="tempering" mode="pair" /> = {bayes.tempering}
-              {' · '}
-              <Term k="normalization" mode="pair" />
-            </p>
+            <ul className="space-y-2">
+              {tail.map((hp) => (
+                <HypothesisCard key={hp.hypothesisId} posterior={hp} />
+              ))}
+            </ul>
           </Disclosure>
         </li>
-      </ul>
-    </div>
+      )}
+
+      <AiProposedCards />
+    </ul>
   );
 }

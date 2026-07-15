@@ -19,11 +19,12 @@ import { useAppStore, type TabId } from '../state/store';
 import AskDrawer from './ask/AskDrawer';
 import BriefingTab from './briefing/BriefingTab';
 import StoryOverlay from './story/StoryOverlay';
+// StatusRibbon removed (v4): the Command View carries every number it recapped,
+// one back-click away — the detail-view header stays calm.
 import DecisionTab from './DecisionTab';
 import ExportTab from './ExportTab';
 import FlightDeck from './FlightDeck';
 import MissionHome from './MissionHome';
-import StatusRibbon from './StatusRibbon';
 import TriageTab from './TriageTab';
 import Workbench from './Workbench';
 
@@ -83,9 +84,6 @@ export default function Dashboard() {
                   <MessageCircleQuestion size={12} /> ask
                 </button>
               )}
-              <div className="ml-auto">
-                <StatusRibbon />
-              </div>
             </>
           )}
         </div>

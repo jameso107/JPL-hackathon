@@ -19,8 +19,9 @@ import {
 
 export { buildFallbackNarrative };
 
-/** Client-side timeout on each proxy round-trip. */
-export const CLIENT_TIMEOUT_MS = 15_000;
+/** Client-side timeout on each proxy round-trip — must exceed the proxy's 30s
+ *  upstream budget (a 31B reasoning model can take a while to emit 2K tokens). */
+export const CLIENT_TIMEOUT_MS = 45_000;
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 

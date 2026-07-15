@@ -5,7 +5,9 @@
  */
 import { buildMessages, MAX_TOKENS, TEMPERATURE, type RetryInfo } from './prompt';
 
-export const UPSTREAM_TIMEOUT_MS = 30_000;
+// A 31B reasoning model emits a <think> block before the JSON, so first-token
+// and total latency run well past 30s. Give it real headroom.
+export const UPSTREAM_TIMEOUT_MS = 120_000;
 export const ERROR_TRUNCATE_CHARS = 500;
 
 export interface UpstreamConfig {
@@ -120,12 +122,13 @@ export async function handleDispositionRequest(
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
   try {
     let res: Awaited<ReturnType<typeof fetch>>;
+    let text: string;
     try {
       res = await fetch(chatCompletionsUrl(cfg.baseUrl), {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          authorization: `Bearer ${cfg.apiKey}`,
+          authorization: `Bearer ${cfg.apiKey.trim()}`,
         },
         body: JSON.stringify({
           model: cfg.model,
@@ -135,14 +138,16 @@ export async function handleDispositionRequest(
         }),
         signal: controller.signal,
       });
+      // Read the body INSIDE the try: a reasoning model can stream past the
+      // timeout, and an abort during the body read must report as a clean
+      // timeout — not escape as an uncaught 500 "This operation was aborted".
+      text = await res.text();
     } catch (err) {
       const reason = controller.signal.aborted
-        ? `upstream timeout after ${UPSTREAM_TIMEOUT_MS / 1000}s`
+        ? `upstream timed out after ${UPSTREAM_TIMEOUT_MS / 1000}s — the model was still generating (reasoning models are slow); raise UPSTREAM_TIMEOUT_MS if this recurs`
         : `upstream request failed: ${describeFetchError(err)}`;
       return { status: 502, body: { error: truncate(reason) } };
     }
-
-    const text = await res.text();
     if (!res.ok) {
       return { status: 502, body: { error: truncate(`upstream ${res.status}: ${text}`) } };
     }

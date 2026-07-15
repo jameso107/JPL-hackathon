@@ -5,7 +5,9 @@
  */
 
 export const TEMPERATURE = 0.2;
-export const MAX_TOKENS = 2000;
+// Reasoning is enabled on gemma4:31b — the <think> block consumes budget before
+// the JSON answer, so keep enough headroom that the answer never truncates.
+export const MAX_TOKENS = 4000;
 
 const NARRATIVE_SCHEMA_INLINE = `{
   "executiveSummary": "string — <= 120 words; use the provided numbers verbatim",

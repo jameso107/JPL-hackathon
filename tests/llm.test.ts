@@ -601,7 +601,7 @@ describe('server prompt', () => {
     expect(SYSTEM_PROMPT).toContain('executiveSummary');
     expect(SYSTEM_PROMPT).toContain('distinguishingTest');
     expect(TEMPERATURE).toBe(0.2);
-    expect(MAX_TOKENS).toBe(2000);
+    expect(MAX_TOKENS).toBe(4000);
   });
 
   it('buildMessages produces [system, user] and appends the corrective turn on retry', () => {
@@ -687,7 +687,7 @@ describe('server upstream', () => {
     };
     expect(sent.model).toBe('test-model');
     expect(sent.temperature).toBe(0.2);
-    expect(sent.max_tokens).toBe(2000);
+    expect(sent.max_tokens).toBe(4000);
     expect(sent.messages.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
   });
 
@@ -707,6 +707,44 @@ describe('server upstream', () => {
     const err = res.body.error as string;
     expect(err.length).toBeLessThanOrEqual(500);
     expect(err).toContain('upstream 500');
+  });
+
+  it('an abort while reading the body returns a clean 502 timeout, never throws', async () => {
+    // Reproduces the "This operation was aborted" 500: headers arrive, then the
+    // body read is aborted by the upstream timeout. Must be caught → 502.
+    const abortErr = Object.assign(new Error('This operation was aborted'), {
+      name: 'AbortError',
+    });
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => {
+        throw abortErr;
+      },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const env = {
+      CHATHPC_BASE_URL: 'https://chathpc.example/v1',
+      CHATHPC_API_KEY: 'k',
+      CHATHPC_MODEL: 'm',
+    };
+    const res = await handleDispositionRequest({ payload: {} }, env);
+    expect(res.status).toBe(502);
+    expect(String(res.body.error)).toMatch(/upstream request failed|timed out/i);
+  });
+
+  it('rejects a masked (non-ASCII) API key with a clear 503 before calling upstream', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const env = {
+      CHATHPC_BASE_URL: 'https://chathpc.example/v1',
+      CHATHPC_API_KEY: 'sk-3230e••••',
+      CHATHPC_MODEL: 'm',
+    };
+    const res = await handleDispositionRequest({ payload: {} }, env);
+    expect(res.status).toBe(503);
+    expect(String(res.body.error)).toMatch(/non-ASCII|masked/i);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('truncate caps at the requested length', () => {

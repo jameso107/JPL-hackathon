@@ -10,10 +10,10 @@
  * changes in BOTH places.
  */
 
-const UPSTREAM_TIMEOUT_MS = 30_000;
+const UPSTREAM_TIMEOUT_MS = 120_000;
 const ERROR_TRUNCATE_CHARS = 500;
 const TEMPERATURE = 0.2;
-const MAX_TOKENS = 2000;
+const MAX_TOKENS = 4000;
 
 const NARRATIVE_SCHEMA_INLINE = `{
   "executiveSummary": "string — <= 120 words; use the provided numbers verbatim",
@@ -154,6 +154,7 @@ async function handleDisposition(rawBody: unknown): Promise<DispositionResponse>
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
   try {
     let res: Awaited<ReturnType<typeof fetch>>;
+    let text: string;
     try {
       res = await fetch(chatCompletionsUrl(baseUrl.trim()), {
         method: 'POST',
@@ -169,14 +170,15 @@ async function handleDisposition(rawBody: unknown): Promise<DispositionResponse>
         }),
         signal: controller.signal,
       });
+      // Body read inside the try: an abort during the read must report as a
+      // clean timeout, not escape as an uncaught 500.
+      text = await res.text();
     } catch (err) {
       const reason = controller.signal.aborted
-        ? `upstream timeout after ${UPSTREAM_TIMEOUT_MS / 1000}s`
+        ? `upstream timed out after ${UPSTREAM_TIMEOUT_MS / 1000}s — the model was still generating (reasoning models are slow)`
         : `upstream request failed: ${describeFetchError(err)}`;
       return { status: 502, body: { error: truncate(reason) } };
     }
-
-    const text = await res.text();
     if (!res.ok) {
       return { status: 502, body: { error: truncate(`upstream ${res.status}: ${text}`) } };
     }

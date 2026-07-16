@@ -16,13 +16,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import {
+  getIngenuityModel,
+  loadIngenuityModel,
+  prepareIngenuity,
+  type IngenuityInstance,
+} from '../../scenes/ingenuity';
 import type { ReconstructedFlight } from '../../scenes/reconstruct';
 import { vibrationRgb } from '../../scenes/reconstruct';
-import {
-  buildHelicopterMarker,
-  buildPathTube,
-  createDeckScene,
-} from '../../scenes/sceneSetup';
+import { buildPathTube, createDeckScene } from '../../scenes/sceneSetup';
 import { AXIS_LINE, AXIS_TICK } from '../shared/charts';
 import { fmtNum } from '../shared/format';
 import { P } from '../shared/palette';
@@ -109,8 +111,6 @@ function StripChart({
 
 export default function FlightReplay({ reconstruction: r, alertThresholdG }: FlightReplayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const markerRef = useRef<THREE.Group | null>(null);
-  const rotorRef = useRef<THREE.Mesh | null>(null);
   const trailRef = useRef<THREE.Mesh | null>(null);
 
   const [playing, setPlaying] = useState(true);
@@ -147,10 +147,18 @@ export default function FlightReplay({ reconstruction: r, alertThresholdG }: Fli
     deck.scene.add(tube);
     trailRef.current = tube;
 
-    const { group, rotor } = buildHelicopterMarker();
-    deck.scene.add(group);
-    markerRef.current = group;
-    rotorRef.current = rotor;
+    // Ingenuity marker — real NASA GLB (cached) or procedural fallback. Loads
+    // async on first mount; near-instant once cached. Mounts once when ready.
+    let heli: IngenuityInstance | null = null;
+    let cancelled = false;
+    const mountHeli = (root: THREE.Group | null) => {
+      if (cancelled || heli) return;
+      heli = prepareIngenuity(root);
+      deck.scene.add(heli.group);
+    };
+    const cachedModel = getIngenuityModel();
+    if (cachedModel) mountHeli(cachedModel);
+    else void loadIngenuityModel().then((root) => mountHeli(root));
 
     // frame the flight: aim at the track midpoint, distance scaled to track size
     const mid = r.path[Math.floor(r.path.length / 2)];
@@ -172,9 +180,16 @@ export default function FlightReplay({ reconstruction: r, alertThresholdG }: Fli
       }
       const p = r.durationS > 0 ? tRef.current / r.durationS : 0;
       const pos = sampleAt(r.path, p);
-      group.position.set(pos.x, pos.y, pos.z);
       const ch = sampleAt(r.channels, p);
-      rotor.rotation.y += dt * (ch.rpm / 60) * Math.PI * 0.4; // stylized spin
+      if (heli) {
+        heli.group.position.set(pos.x, pos.y, pos.z);
+        // yaw into travel from the local path tangent
+        const ahead = sampleAt(r.path, Math.min(1, p + 0.02));
+        const dx = ahead.x - pos.x;
+        const dz = ahead.z - pos.z;
+        if (dx * dx + dz * dz > 1e-4) heli.group.rotation.y = Math.atan2(dx, dz);
+        heli.spin(dt, ch.rpm);
+      }
       const drawTotal = (tube.geometry.index?.count ?? 0) * p;
       tube.geometry.setDrawRange(0, Math.ceil(drawTotal));
       chartAccum += dt;
@@ -186,7 +201,14 @@ export default function FlightReplay({ reconstruction: r, alertThresholdG }: Fli
     });
 
     return () => {
+      cancelled = true;
       off();
+      if (heli) {
+        // Remove the model before disposing the deck: its geometry/materials are
+        // shared with the cached GLB, which a scene-wide dispose would free.
+        deck.scene.remove(heli.group);
+        heli.dispose();
+      }
       deck.dispose();
     };
   }, [r, alertThresholdG]);

@@ -1,27 +1,26 @@
 /**
- * Flight Deck tab — Phase 2. Three modes over a shared scene stack:
- * Fleet History · Flight Replay · Spot the Anomaly. Terrain is a procedural
- * Mars-like heightfield (real Jezero DEM swaps in via scripts/bake_dem.py).
+ * Flight Deck tab — Phase 2. Two modes over a shared scene stack:
+ * Fleet History · Flight Replay, over real Jezero Crater terrain (USGS Mars
+ * 2020 CTX DEM via scripts/bake_dem.py; procedural stand-in if unbaked).
  */
 import { clsx } from 'clsx';
-import { Clapperboard, History, Puzzle } from 'lucide-react';
+import { Clapperboard, History } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { analyticsConfig } from '../config';
 import { loadJezeroTerrain } from '../scenes/heightfield';
+import { loadIngenuityModel } from '../scenes/ingenuity';
 import { reconstructFlight } from '../scenes/reconstruct';
 import { setHeightfield } from '../scenes/terrain';
 import { useAppStore } from '../state/store';
 import FleetHistory from './flightdeck/FleetHistory';
 import FlightReplay from './flightdeck/FlightReplay';
-import SpotAnomaly from './flightdeck/SpotAnomaly';
-import { Badge, EmptyState } from './shared/ui';
+import { EmptyState } from './shared/ui';
 
-type DeckMode = 'fleet' | 'replay' | 'spot';
+type DeckMode = 'fleet' | 'replay';
 
 const MODES: { id: DeckMode; label: string; icon: React.ReactNode }[] = [
   { id: 'fleet', label: 'Fleet History', icon: <History size={12} /> },
   { id: 'replay', label: 'Flight Replay', icon: <Clapperboard size={12} /> },
-  { id: 'spot', label: 'Spot the Anomaly', icon: <Puzzle size={12} /> },
 ];
 
 export default function FlightDeck() {
@@ -32,18 +31,16 @@ export default function FlightDeck() {
   // Install the real Jezero DEM (if baked) BEFORE reconstructing flights, so the
   // paths ride the true surface. Falls back to procedural terrain on failure.
   const [terrainReady, setTerrainReady] = useState(false);
-  const [terrainReal, setTerrainReal] = useState(false);
 
   useEffect(() => {
     let alive = true;
     void loadJezeroTerrain().then((t) => {
       if (!alive) return;
-      if (t) {
-        setHeightfield(t.heightfield);
-        setTerrainReal(true);
-      }
+      if (t) setHeightfield(t.heightfield);
       setTerrainReady(true);
     });
+    // Warm the Ingenuity GLB cache so it's ready when Flight Replay opens.
+    void loadIngenuityModel();
     return () => {
       alive = false;
     };
@@ -128,19 +125,6 @@ export default function FlightDeck() {
             ))}
           </select>
         )}
-
-        <div className="ml-auto">
-          <Badge
-            tone={terrainReal ? 'accent' : 'warning'}
-            title={
-              terrainReal
-                ? 'Terrain: real Jezero Crater elevation & imagery from the USGS Mars 2020 CTX DEM (NASA/JPL-Caltech/USGS), vertical exaggeration ~2.4×. Flight paths and channel curves are reconstructed from per-flight summary telemetry (recorded values are the anchors).'
-                : 'Flight paths and channel curves are parameterized from per-flight summary telemetry (recorded values are the anchors). Terrain is a procedural Mars-like stand-in (real Jezero DEM not baked).'
-            }
-          >
-            {terrainReal ? 'real Jezero terrain · paths reconstructed' : 'reconstructed · details on hover'}
-          </Badge>
-        </div>
       </div>
 
       {mode === 'fleet' && (
@@ -161,10 +145,6 @@ export default function FlightDeck() {
           reconstruction={replayTarget}
           alertThresholdG={alertThresholdG}
         />
-      )}
-
-      {mode === 'spot' && (
-        <SpotAnomaly reconstructions={reconstructions} alertThresholdG={alertThresholdG} />
       )}
 
       {mode === 'fleet' && selectedFlight !== null && (

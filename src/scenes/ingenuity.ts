@@ -21,12 +21,18 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 /** Rotor-span footprint in scene metres (the loaded model is scaled to this). */
 const TARGET_SPAN_M = 18;
 const UP = new THREE.Vector3(0, 1, 0);
+/**
+ * Rotor angular speed (rad/s) — a calm, watchable rate, deliberately decoupled
+ * from the true ~2400 rpm (which strobes into a blur). ~1.2 rad/s is roughly one
+ * revolution every 5 s, so a blade sweeps ~70°/s and stays easy to track. Tune here.
+ */
+const ROTOR_RAD_PER_SEC = 1.2;
 
 export interface IngenuityInstance {
   /** Root group — the caller sets position (path point) and rotation.y (yaw). */
   group: THREE.Group;
-  /** Advance the coaxial rotors one frame (counter-rotating), scaled by rpm. */
-  spin(dt: number, rpm: number): void;
+  /** Advance the coaxial rotors one frame at a calm fixed rate (counter-rotating). */
+  spin(dt: number): void;
   /** Dispose per-mount resources (procedural fallback only; the cached GLB is left alive). */
   dispose(): void;
   /** true when built procedurally because the GLB was unavailable. */
@@ -109,8 +115,8 @@ export function prepareIngenuity(root: THREE.Group | null): IngenuityInstance {
   return {
     group,
     procedural: false,
-    spin(dt, rpm) {
-      const step = dt * (rpm / 60) * Math.PI * 0.5; // stylized (true ~2400rpm strobes)
+    spin(dt) {
+      const step = dt * ROTOR_RAD_PER_SEC;
       rotors.forEach((r, i) => r.rotateOnWorldAxis(UP, i % 2 === 0 ? step : -step));
     },
     dispose() {
@@ -187,8 +193,8 @@ export function buildIngenuityFallback(): IngenuityInstance {
   return {
     group,
     procedural: true,
-    spin(dt, rpm) {
-      const step = dt * (rpm / 60) * Math.PI * 0.5;
+    spin(dt) {
+      const step = dt * ROTOR_RAD_PER_SEC;
       upper.rotateOnWorldAxis(UP, step);
       lower.rotateOnWorldAxis(UP, -step);
     },

@@ -180,7 +180,6 @@ export default function FlightReplay({ reconstruction: r, alertThresholdG }: Fli
       }
       const p = r.durationS > 0 ? tRef.current / r.durationS : 0;
       const pos = sampleAt(r.path, p);
-      const ch = sampleAt(r.channels, p);
       if (heli) {
         heli.group.position.set(pos.x, pos.y, pos.z);
         // yaw into travel from the local path tangent
@@ -188,7 +187,7 @@ export default function FlightReplay({ reconstruction: r, alertThresholdG }: Fli
         const dx = ahead.x - pos.x;
         const dz = ahead.z - pos.z;
         if (dx * dx + dz * dz > 1e-4) heli.group.rotation.y = Math.atan2(dx, dz);
-        heli.spin(dt, ch.rpm);
+        heli.spin(dt);
       }
       const drawTotal = (tube.geometry.index?.count ?? 0) * p;
       tube.geometry.setDrawRange(0, Math.ceil(drawTotal));

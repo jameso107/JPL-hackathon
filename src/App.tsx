@@ -1,5 +1,10 @@
 import Dashboard from './components/Dashboard';
+import PasswordGate from './components/PasswordGate';
 
 export default function App() {
-  return <Dashboard />;
+  return (
+    <PasswordGate>
+      <Dashboard />
+    </PasswordGate>
+  );
 }
